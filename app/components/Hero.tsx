@@ -43,7 +43,7 @@ export default function Hero() {
       {/* 背景画像 */}
       <div className="absolute inset-0">
         <Image
-          src="/placeholder.svg?height=1080&width=1920"
+          src="/images/sit.JPG?height=1080&width=1920"
           alt="Wedding ceremony background"
           fill
           className="object-cover"
