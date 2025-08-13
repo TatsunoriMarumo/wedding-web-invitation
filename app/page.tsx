@@ -1,12 +1,64 @@
-import Hero from "@/components/hero/Hero";
-import Image from "next/image";
+import { Suspense } from "react";
+import Header from "./components/Header";
+import Hero from "./components/Hero";
+import CoupleProfile from "./components/CoupleProfile";
+import DressCode from "./components/DressCode";
+import RsvpSection from "./components/RsvpSection";
+import Access from "./components/Access";
+import Gallery from "./components/Gallery";
+import Footer from "./components/Footer";
+import StickyCtaBar from "./components/StickyCtaBar";
+import SectionDivider from "./components/SectionDivider";
 
 export default function Home() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+    <main className="min-h-screen bg-gradient-to-b from-sky-50 to-white">
+      <Header />
+
+      <section id="intro">
         <Hero />
-      </main>
-    </div>
+      </section>
+
+      <SectionDivider />
+
+      <section id="profile" className="py-16 md:py-24">
+        <CoupleProfile />
+      </section>
+
+      <SectionDivider variant="reverse" />
+
+      <section
+        id="dresscode"
+        className="py-16 md:py-24 bg-gradient-to-r from-sky-50 to-pink-50"
+      >
+        <DressCode />
+      </section>
+
+      <SectionDivider />
+
+      <section id="rsvp" className="py-16 md:py-24">
+        <Suspense fallback={<div className="text-center">読み込み中...</div>}>
+          <RsvpSection />
+        </Suspense>
+      </section>
+
+      <SectionDivider variant="reverse" />
+
+      <section
+        id="access"
+        className="py-16 md:py-24 bg-gradient-to-r from-orange-50 to-yellow-50"
+      >
+        <Access />
+      </section>
+
+      <SectionDivider />
+
+      <section id="gallery" className="py-16 md:py-24">
+        <Gallery />
+      </section>
+
+      <Footer />
+      <StickyCtaBar />
+    </main>
   );
 }
