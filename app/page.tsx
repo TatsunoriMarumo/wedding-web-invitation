@@ -7,7 +7,6 @@ import RsvpSection from "./components/RsvpSection";
 import Access from "./components/Access";
 import Gallery from "./components/Gallery";
 import Footer from "./components/Footer";
-import StickyCtaBar from "./components/StickyCtaBar";
 import SectionDivider from "./components/SectionDivider";
 
 export default function Home() {
@@ -58,7 +57,6 @@ export default function Home() {
       </section>
 
       <Footer />
-      <StickyCtaBar />
     </main>
   );
 }

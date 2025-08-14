@@ -14,7 +14,7 @@ export default function Hero() {
   });
 
   useEffect(() => {
-    const weddingDate = new Date("2024-06-15T14:30:00");
+    const weddingDate = new Date("2025-12-13T10:30:00");
 
     const updateCountdown = () => {
       const now = new Date();
@@ -100,13 +100,6 @@ export default function Hero() {
           <p className="text-base md:text-lg leading-relaxed opacity-90 max-w-2xl mx-auto">
             {t("hero.greeting")}
           </p>
-        </div>
-      </div>
-
-      {/* スクロール指示 */}
-      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-        <div className="w-6 h-10 border-2 border-white/50 rounded-full flex justify-center">
-          <div className="w-1 h-3 bg-white/50 rounded-full mt-2 animate-pulse" />
         </div>
       </div>
     </div>

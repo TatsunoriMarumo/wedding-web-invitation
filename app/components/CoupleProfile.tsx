@@ -28,9 +28,6 @@ export default function CoupleProfile() {
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
-            <div className="absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-sky-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl">👨</span>
-            </div>
           </div>
 
           <h3 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-4">
@@ -56,11 +53,7 @@ export default function CoupleProfile() {
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </div>
-            <div className="absolute -top-4 -right-4 w-16 h-16 bg-gradient-to-br from-pink-400 to-rose-500 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl">👰</span>
-            </div>
           </div>
-
           <h3 className="text-2xl md:text-3xl font-semibold text-gray-800 mb-4">
             {t("profile.bride.name")}
           </h3>
