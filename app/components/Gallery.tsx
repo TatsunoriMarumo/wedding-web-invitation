@@ -19,18 +19,35 @@ export default function Gallery() {
   const [current, setCurrent] = useState(0);
   const currentRef = useRef(0);
 
+  const files = [
+    "airbnb_pizza.png",
+    "clam_chowder.png",
+    "dennys.png",
+    "donut.png",
+    "graduation.png",
+    "gum_wall.png",
+    "hamburger.png",
+    "look2.png",
+    "public_market.png",
+    "rachel.png",
+    "starbucks.png",
+    "washinton_uni.png",
+  ]
+
+  const altList =
+  (t("gallery.images", { returnObjects: true }) as string[] | undefined) ?? [];
+
+
   const galleryImages = useMemo(
-    () =>
-      t("gallery.images").map((alt: string, index: number) => ({
-        id: index + 1,
-        src: `/placeholder.svg?height=${index % 2 === 0 ? 400 : 600}&width=${
-          index % 2 === 0 ? 600 : 400
-        }&query=wedding photo ${index + 1}`,
-        alt,
-        title: alt,
-      })),
-    [t]
-  );
+  () =>
+    files.map((file, index) => ({
+      id: index + 1,
+      src: `/images/honeymoon/${file}`,           // ← ここが実ファイルのパス
+      alt: altList[index] ?? `写真 ${index + 1}`,  // ← フォールバックあり
+      title: altList[index] ?? `写真 ${index + 1}`,
+    })),
+  [t] // 言語切替でaltが更新されるように
+);
 
   useEffect(() => {
     const checkMobile = () => {
