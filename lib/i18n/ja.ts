@@ -179,7 +179,7 @@ export const ja = {
   },
   footer: {
     contact: "お問い合わせ",
-    copyright: "© 2024 太郎 & 花子. All rights reserved.",
+    copyright: "© 2025 拓人 & ひなの. All rights reserved.",
   },
   meta: {
     title: "結婚式のご招待 | 太郎 & 花子",
