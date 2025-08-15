@@ -25,7 +25,7 @@ export default function CoupleProfile() {
                 alt="新郎の写真"
                 width={400}
                 height={400}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover object-[50%_5%] group-hover:scale-105 transition-transform duration-300"
               />
             </div>
           </div>
@@ -50,7 +50,7 @@ export default function CoupleProfile() {
                 alt="新婦の写真"
                 width={400}
                 height={400}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                className="w-full h-full object-cover object-[50%_3%] group-hover:scale-105 transition-transform duration-300"
               />
             </div>
           </div>
