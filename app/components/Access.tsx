@@ -11,26 +11,7 @@ import {
 
 export default function Access() {
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState("train");
-
-  const transportOptions = [
-    {
-      id: "train",
-      icon: BuildingOffice2Icon,
-      label: t("access.transport.train.label"),
-      time: t("access.transport.train.time"),
-      description: t("access.transport.train.description"),
-      details: t("access.transport.train.details"),
-    },
-    {
-      id: "taxi",
-      icon: TruckIcon,
-      label: t("access.transport.taxi.label"),
-      time: t("access.transport.taxi.time"),
-      description: t("access.transport.taxi.description"),
-      details: t("access.transport.taxi.details"),
-    },
-  ];
+  const [activeTab, setActiveTab] = useState<"walk" | "taxi">("walk");
 
   return (
     <div className="container mx-auto px-4">
@@ -73,66 +54,113 @@ export default function Access() {
 
         {/* アクセス方法 */}
         <div className="space-y-6">
-          {/* タブ */}
-          <div className="flex space-x-2 bg-gray-100 rounded-xl p-1">
-            {transportOptions.map((option) => (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h3 className="text-xl font-semibold text-gray-800 mb-4">
+              {t("access.tabs.title")}
+            </h3>
+
+            {/* タブボタン */}
+            <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
               <button
-                key={option.id}
-                onClick={() => setActiveTab(option.id)}
-                className={`flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-lg transition-all ${
-                  activeTab === option.id
-                    ? "bg-white shadow-md text-pink-600"
+                onClick={() => setActiveTab("walk")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "walk"
+                    ? "bg-white text-pink-600 shadow-sm"
                     : "text-gray-600 hover:text-gray-800"
                 }`}
               >
-                <option.icon className="w-5 h-5" />
-                <span className="font-medium">{option.label}</span>
+                {t("access.tabs.walk")}
               </button>
-            ))}
-          </div>
+              <button
+                onClick={() => setActiveTab("taxi")}
+                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === "taxi"
+                    ? "bg-white text-pink-600 shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                {t("access.tabs.taxi")}
+              </button>
+            </div>
 
-          {/* アクティブなタブの内容 */}
-          {transportOptions.map(
-            (option) =>
-              activeTab === option.id && (
-                <div
-                  key={option.id}
-                  className="bg-white rounded-2xl shadow-lg p-6"
-                >
-                  <div className="flex items-center space-x-3 mb-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-orange-400 rounded-full flex items-center justify-center">
-                      <option.icon className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-800">
-                        {option.label}
-                      </h3>
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <ClockIcon className="w-4 h-4" />
-                        <span className="text-2xl font-bold text-pink-600">
-                          {option.time}
-                        </span>
-                      </div>
-                    </div>
+            {/* タブコンテンツ */}
+            {activeTab === "walk" && (
+              <div>
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-orange-400 rounded-full flex items-center justify-center">
+                    <BuildingOffice2Icon className="w-6 h-6 text-white" />
                   </div>
-
-                  <p className="text-gray-700 mb-4">{option.description}</p>
-
-                  <div className="space-y-2">
-                    {option.details.map((detail: string, index: number) => (
-                      <div key={index} className="flex items-start space-x-3">
-                        <div className="w-6 h-6 bg-pink-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                          <span className="text-pink-600 text-sm font-medium">
-                            {index + 1}
-                          </span>
-                        </div>
-                        <p className="text-gray-700">{detail}</p>
-                      </div>
-                    ))}
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800">
+                      徒歩
+                    </h4>
+                    <div className="flex items-center space-x-2 text-gray-600">
+                      <ClockIcon className="w-4 h-4" />
+                      <span className="text-2xl font-bold text-pink-600">
+                        13分
+                      </span>
+                    </div>
                   </div>
                 </div>
-              )
-          )}
+
+                <p className="text-gray-700 mb-4">
+                  {t("access.walkAccess.description")}
+                </p>
+
+                <div className="space-y-2">
+                  {t("access.walkAccess.details").map(
+                    (detail: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-pink-400 rounded-full flex-shrink-0 mt-2"></div>
+                        <p className="text-gray-700">{detail}</p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === "taxi" && (
+              <div>
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-orange-400 rounded-full flex items-center justify-center">
+                    <TruckIcon className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-gray-800">
+                      タクシー
+                    </h4>
+                    <div className="flex items-center space-x-4 text-gray-600">
+                      <div className="flex items-center space-x-1">
+                        <ClockIcon className="w-4 h-4" />
+                        <span className="text-2xl font-bold text-pink-600">
+                          6分
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-orange-600">
+                        800円
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-gray-700 mb-4">
+                  {t("access.taxiAccess.description")}
+                </p>
+
+                <div className="space-y-2">
+                  {t("access.taxiAccess.details").map(
+                    (detail: string, index: number) => (
+                      <div key={index} className="flex items-start space-x-3">
+                        <div className="w-2 h-2 bg-pink-400 rounded-full flex-shrink-0 mt-2"></div>
+                        <p className="text-gray-700">{detail}</p>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* 当日カード */}
           <div className="bg-gradient-to-br from-sky-50 to-pink-50 rounded-2xl p-6 border-2 border-dashed border-pink-200">
