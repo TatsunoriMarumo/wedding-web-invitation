@@ -14,7 +14,7 @@ export default function Hero() {
   });
 
   useEffect(() => {
-    const weddingDate = new Date("2025-12-13T10:30:00");
+    const weddingDate = new Date("2025-12-13T10:30:00+09:00");
 
     const updateCountdown = () => {
       const now = new Date();
