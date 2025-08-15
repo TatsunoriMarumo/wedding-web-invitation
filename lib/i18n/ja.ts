@@ -10,9 +10,9 @@ export const ja = {
   hero: {
     title: "結婚式のご招待",
     subtitle: "私たちの特別な日を一緒にお祝いください",
-    date: "2024年6月15日（土）",
-    time: "午後2時30分 挙式開始",
-    venue: "ホテル椿山荘東京",
+    date: "2025年12月13日（土）",
+    time: "10:30 挙式開始",
+    venue: "パークサイドハウス大阪梅田",
     greeting:
       "この度は私たちの結婚式にお招きいただき、誠にありがとうございます。皆様と一緒に素敵な時間を過ごせることを心より楽しみにしております。",
   },
@@ -179,7 +179,7 @@ export const ja = {
   },
   footer: {
     contact: "お問い合わせ",
-    copyright: "© 2024 太郎 & 花子. All rights reserved.",
+    copyright: "© 2025 拓人 & ひなの. All rights reserved.",
   },
   meta: {
     title: "結婚式のご招待 | 太郎 & 花子",
