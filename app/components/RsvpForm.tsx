@@ -69,19 +69,21 @@ function AllergyInput({
   const hasDogAllergy = person.allergies.some((a) => a.type === "dog");
   const foodAllergies = person.allergies.filter((a) => a.type === "food");
 
-  const toggleDogAllergy = () => {
-    if (hasDogAllergy) {
-      onUpdate(person.allergies.filter((a) => a.type !== "dog"));
-    } else {
+  const setDogAllergy = (value: boolean) => {
+    const has = person.allergies.some((a) => a.type === "dog");
+    if (value === has) return; // すでに同じ状態なら何もしない
+
+    if (value) {
       const newAllergy: AllergyItem = {
         id: Date.now().toString(),
         type: "dog",
         allergen: "犬",
       };
       onUpdate([...person.allergies, newAllergy]);
+    } else {
+      onUpdate(person.allergies.filter((a) => a.type !== "dog"));
     }
   };
-
   const addFoodAllergy = (allergen: string) => {
     if (!allergen.trim()) return;
 
@@ -117,7 +119,8 @@ function AllergyInput({
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={toggleDogAllergy}
+            onClick={() => setDogAllergy(false)} // ← いいえ固定
+            aria-pressed={!hasDogAllergy}
             className={`p-3 rounded-lg border-2 transition-all text-sm ${
               !hasDogAllergy
                 ? "border-green-500 bg-green-50 text-green-700"
@@ -128,7 +131,8 @@ function AllergyInput({
           </button>
           <button
             type="button"
-            onClick={toggleDogAllergy}
+            onClick={() => setDogAllergy(true)} // ← はい固定
+            aria-pressed={hasDogAllergy}
             className={`p-3 rounded-lg border-2 transition-all text-sm ${
               hasDogAllergy
                 ? "border-red-500 bg-red-50 text-red-700"
@@ -351,7 +355,7 @@ export default function RsvpForm({ token }: { token: string }) {
               {t("rsvp.form.steps.basic")}
             </h3>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   {t("rsvp.form.lastname")} *
@@ -500,7 +504,7 @@ export default function RsvpForm({ token }: { token: string }) {
                 {formData.companions.map((companion, index) => (
                   <div
                     key={companion.id}
-                    className="border border-gray-200 rounded-lg p-4 space-y-4"
+                    className="border border-gray-200 rounded-lg p-4 space-y-4 overflow-hidden"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-gray-700">
@@ -515,7 +519,7 @@ export default function RsvpForm({ token }: { token: string }) {
                       </button>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
                       <input
                         type="text"
                         required
@@ -528,7 +532,7 @@ export default function RsvpForm({ token }: { token: string }) {
                             lastName: e.target.value,
                           })
                         }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                       />
                       <input
                         type="text"
@@ -542,7 +546,7 @@ export default function RsvpForm({ token }: { token: string }) {
                             firstName: e.target.value,
                           })
                         }
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                       />
                     </div>
 
