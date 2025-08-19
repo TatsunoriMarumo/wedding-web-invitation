@@ -7,29 +7,15 @@ import Image from "next/image";
 export default function DressCode() {
   const { t } = useLanguage();
 
-  const okExample = {
-    image: "/images/suit-punta.png?height=400&width=300",
-    memos: [
-      "ダークカラーのスーツ（ネイビー、チャコール等）",
-      "膝丈以上の上品なワンピース",
-      "きちんと感のあるジャケットスタイル",
-      "3-5cmヒールの上品な靴",
-      "アクセサリーは控えめに",
-      "清潔感のある髪型・メイク",
-    ],
-  };
 
-  const ngExample = {
-    image: "/images/t-shirt-punta.png?height=400&width=300",
-    memos: [
-      "ジーンズ、Tシャツ、スニーカーなど",
-      "白い服装（新婦と被る色）",
-      "肩や胸元が大きく開いた服",
-      "つま先の見える靴、ビーチサンダル",
-      "派手すぎるアクセサリー",
-      "カジュアル過ぎる髪型",
-    ],
-  };
+  const okMemos = (t("dresscode.ok.memos") as unknown as string[]) ?? [];
+  const ngMemos = (t("dresscode.ng.memos") as unknown as string[]) ?? [];
+
+  const okAlt = (t("dresscode.ok.alt") as string);
+  const ngAlt = (t("dresscode.ng.alt") as string);
+
+  const okImage = "/images/suit-punta.png?height=400&width=300";
+  const ngImage = "/images/t-shirt-punta.png?height=400&width=300";
 
   return (
     <div className="container mx-auto px-4">
@@ -58,8 +44,8 @@ export default function DressCode() {
               <div className="flex-shrink-0 w-full md:w-80">
                 <div className="relative bg-green-50 rounded-xl overflow-hidden shadow-md">
                   <Image
-                    src={okExample.image || "/placeholder.svg"}
-                    alt="推奨ドレスコード例"
+                    src={okImage || "/placeholder.svg"}
+                    alt={okAlt}
                     width={300}
                     height={400}
                     className="w-full h-80 object-cover"
@@ -73,10 +59,10 @@ export default function DressCode() {
               <div className="flex-1">
                 <div className="bg-green-50 p-6 rounded-xl">
                   <h4 className="font-semibold text-gray-800 text-lg mb-4">
-                    推奨スタイルのポイント
+                    {t("dresscode.point.ok")}
                   </h4>
                   <div className="space-y-3">
-                    {okExample.memos.map((memo, index) => (
+                    {okMemos.map((memo, index) => (
                       <div key={index} className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                         <p className="text-gray-700 leading-relaxed">{memo}</p>
@@ -105,8 +91,8 @@ export default function DressCode() {
               <div className="flex-shrink-0 w-full md:w-80">
                 <div className="relative bg-red-50 rounded-xl overflow-hidden shadow-md">
                   <Image
-                    src={ngExample.image || "/placeholder.svg"}
-                    alt="NGドレスコード例"
+                    src={ngImage || "/placeholder.svg"}
+                    alt={ngAlt}
                     width={300}
                     height={400}
                     className="w-full h-80 object-cover"
@@ -120,10 +106,10 @@ export default function DressCode() {
               <div className="flex-1">
                 <div className="bg-red-50 p-6 rounded-xl">
                   <h4 className="font-semibold text-gray-800 text-lg mb-4">
-                    避けていただきたいスタイル
+                    {t("dresscode.point.ng")}
                   </h4>
                   <div className="space-y-3">
-                    {ngExample.memos.map((memo, index) => (
+                    {ngMemos.map((memo, index) => (
                       <div key={index} className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-2 h-2 bg-red-500 rounded-full mt-2"></div>
                         <p className="text-gray-700 leading-relaxed">{memo}</p>
