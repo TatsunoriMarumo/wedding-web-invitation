@@ -92,12 +92,12 @@ export default function Access() {
                   </div>
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800">
-                      徒歩
+                      {t("access.tabs.walk")}
                     </h4>
                     <div className="flex items-center space-x-2 text-gray-600">
                       <ClockIcon className="w-4 h-4" />
                       <span className="text-2xl font-bold text-pink-600">
-                        13分
+                        {t("access.walkAccess.duration")}
                       </span>
                     </div>
                   </div>
@@ -128,17 +128,17 @@ export default function Access() {
                   </div>
                   <div>
                     <h4 className="text-lg font-semibold text-gray-800">
-                      タクシー
+                      {t("access.tabs.taxi")}
                     </h4>
                     <div className="flex items-center space-x-4 text-gray-600">
                       <div className="flex items-center space-x-1">
                         <ClockIcon className="w-4 h-4" />
                         <span className="text-2xl font-bold text-pink-600">
-                          6分
+                          {t("access.taxiAccess.duration")}
                         </span>
                       </div>
                       <div className="text-2xl font-bold text-orange-600">
-                        800円
+                        {t("access.taxiAccess.fare")}
                       </div>
                     </div>
                   </div>

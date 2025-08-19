@@ -149,6 +149,7 @@ export const ja = {
         "大阪梅田駅茶屋町口からも同様のルート",
         "距離: 約900m、所要時間: 約13分",
       ],
+      duration: "13分"
     },
     taxiAccess: {
       description: "JR大阪駅もしくは大阪梅田駅からタクシーで約6分",
@@ -157,6 +158,8 @@ export const ja = {
         "大阪梅田駅 タクシー乗り場からも利用可能",
         "料金: 約800円、所要時間: 約6分",
       ],
+      duration: "6分",
+      fare: "800円"
     },
     eventCard: {
       title: "当日の詳細",
