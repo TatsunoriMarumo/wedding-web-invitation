@@ -26,6 +26,7 @@ export const ja = {
     seconds: "秒",
   },
   profile: {
+    title: "プロフィール",
     groom: {
       name: "新郎 藤岡拓人",
       message:
