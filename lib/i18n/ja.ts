@@ -177,9 +177,9 @@ export const ja = {
     },
     eventCard: {
       title: "当日の詳細",
-      date: "日時: 2024年6月15日(土)14:30〜",
-      reception: "受付: 14:00〜14:25",
-      contact: "連絡先: 090-1234-5678",
+      date: "日時: 2025年12月13日(土)午前10時30分〜",
+      reception: "受付: 午前9時30分 ~ 午前10時00分",
+      contact: "式場連絡先: 06-6458-0081",
       dresscode: "ドレスコード: フォーマル",
       addToCalendar: "カレンダーに追加",
       share: "共有",
