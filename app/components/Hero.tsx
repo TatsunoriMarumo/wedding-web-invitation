@@ -64,11 +64,16 @@ export default function Hero() {
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-semibold mb-6 tracking-tight">
             {t("hero.title")}
           </h1>
-          <p className="text-lg md:text-xl mb-8 opacity-90">
+          <p>
             {t("hero.subtitle")}
           </p>
 
-          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 md:p-8 mb-8 border border-white/20">
+
+          <div className="
+            bg-white/10 backdrop-blur-md rounded-2xl
+            p-6 md:p-8 mb-8 border border-white/20
+            mt-70 md:mt-12 lg:mt-16
+            ">
             <div className="space-y-2 mb-6">
               <p className="text-xl md:text-2xl font-medium">
                 {t("hero.date")}
@@ -96,10 +101,6 @@ export default function Hero() {
               ))}
             </div>
           </div>
-
-          <p className="text-base md:text-lg leading-relaxed opacity-90 max-w-2xl mx-auto">
-            {t("hero.greeting")}
-          </p>
         </div>
       </div>
     </div>

@@ -8,6 +8,7 @@ import Access from "./components/Access";
 import Gallery from "./components/Gallery";
 import Footer from "./components/Footer";
 import SectionDivider from "./components/SectionDivider";
+import Greeting from "./components/Greeting";
 
 export default function Home() {
   return (
@@ -16,6 +17,10 @@ export default function Home() {
 
       <section id="intro">
         <Hero />
+      </section>
+
+      <section id="profile" className="py-16 md:py-24">
+        <Greeting />
       </section>
 
       <SectionDivider />
