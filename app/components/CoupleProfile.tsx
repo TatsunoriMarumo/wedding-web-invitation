@@ -5,6 +5,8 @@ import Image from "next/image";
 
 export default function CoupleProfile() {
   const { t } = useLanguage();
+  const groomAlt = (t("profile.groom.alt") as string);
+  const brideAlt = (t("profile.bride.alt") as string);
 
   return (
     <div className="container mx-auto px-4">
@@ -22,7 +24,7 @@ export default function CoupleProfile() {
             <div className="w-64 h-64 mx-auto rounded-full overflow-hidden shadow-2xl group-hover:shadow-3xl transition-shadow duration-300">
               <Image
                 src="/images/takuto_profile.JPG?height=400&width=400"
-                alt="新郎の写真"
+                alt={groomAlt}
                 width={400}
                 height={400}
                 className="w-full h-full object-cover object-[50%_5%] group-hover:scale-105 transition-transform duration-300"
@@ -47,7 +49,7 @@ export default function CoupleProfile() {
             <div className="w-64 h-64 mx-auto rounded-full overflow-hidden shadow-2xl group-hover:shadow-3xl transition-shadow duration-300">
               <Image
                 src="/images/hina_profile.JPG?height=400&width=400"
-                alt="新婦の写真"
+                alt={brideAlt}
                 width={400}
                 height={400}
                 className="w-full h-full object-cover object-[50%_3%] group-hover:scale-105 transition-transform duration-300"
