@@ -49,8 +49,9 @@ export default function Gallery() {
   ]
 
   const altList =
-  (t("gallery.images", { returnObjects: true }) as string[] | undefined) ?? [];
-
+    (t("gallery.images", { returnObjects: true }) as
+      | readonly string[]
+      | undefined) ?? ([] as const);
 
 
   const galleryImages = useMemo(
