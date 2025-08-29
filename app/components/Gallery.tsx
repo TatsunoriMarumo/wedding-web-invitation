@@ -20,29 +20,44 @@ export default function Gallery() {
   const currentRef = useRef(0);
 
   const files = [
-    "airbnb_pizza.png",
-    "clam_chowder.png",
-    "dennys.png",
-    "donut.png",
-    "graduation.png",
-    "gum_wall.png",
-    "hamburger.png",
-    "look2.png",
-    "public_market.png",
-    "rachel.png",
-    "starbucks.png",
-    "washinton_uni.png",
+    "honeymoon/airbnb_pizza.png",
+    "honeymoon/clam_chowder.png",
+    "honeymoon/dennys.png",
+    "honeymoon/donut.png",
+    "honeymoon/graduation.png",
+    "honeymoon/gum_wall.png",
+    "honeymoon/hamburger.png",
+    "honeymoon/look2.png",
+    "honeymoon/public_market.png",
+    "honeymoon/rachel.png",
+    "honeymoon/starbucks.png",
+    "honeymoon/washinton_uni.png",
+    "childhood/mini-hina.jpg",
+    "childhood/mini-momo-hina.jpg",
+    "childhood/mini-takuto.jpg",
+    "date/banpaku.JPG",
+    "date/christmas.jpg",
+    "date/first-date.jpg",
+    "date/first-two-shot.jpg",
+    "date/food.jpg",
+    "date/fuji-q.jpg",
+    "date/gandam.jpg",
+    "date/hatsumode.jpg",
+    "date/river.jpg",
+    "date/sakura.jpg",
+    "date/show-ring.jpg"
   ]
 
   const altList =
   (t("gallery.images", { returnObjects: true }) as string[] | undefined) ?? [];
 
 
+
   const galleryImages = useMemo(
   () =>
     files.map((file, index) => ({
       id: index + 1,
-      src: `/images/honeymoon/${file}`,           // ← ここが実ファイルのパス
+      src: `/images/${file}`,           // ← ここが実ファイルのパス
       alt: altList[index] ?? `写真 ${index + 1}`,  // ← フォールバックあり
       title: altList[index] ?? `写真 ${index + 1}`,
     })),

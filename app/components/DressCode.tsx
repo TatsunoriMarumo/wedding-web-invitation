@@ -14,8 +14,8 @@ export default function DressCode() {
   const okAlt = (t("dresscode.ok.alt") as string);
   const ngAlt = (t("dresscode.ng.alt") as string);
 
-  const okImage = "/images/suit-punta.png?height=400&width=300";
-  const ngImage = "/images/t-shirt-punta.png?height=400&width=300";
+  const okImage = "/images/punta/suit-punta.png?height=400&width=300";
+  const ngImage = "/images/punta/t-shirt-punta.png?height=400&width=300";
 
   return (
     <div className="container mx-auto px-4">

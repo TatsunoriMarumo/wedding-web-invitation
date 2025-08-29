@@ -23,7 +23,7 @@ export default function CoupleProfile() {
           <div className="relative mb-6 inline-block">
             <div className="w-64 h-64 mx-auto rounded-full overflow-hidden shadow-2xl group-hover:shadow-3xl transition-shadow duration-300">
               <Image
-                src="/images/takuto_profile.JPG?height=400&width=400"
+                src="/images/takuto/takuto_profile.JPG?height=400&width=400"
                 alt={groomAlt}
                 width={400}
                 height={400}
@@ -48,7 +48,7 @@ export default function CoupleProfile() {
           <div className="relative mb-6 inline-block">
             <div className="w-64 h-64 mx-auto rounded-full overflow-hidden shadow-2xl group-hover:shadow-3xl transition-shadow duration-300">
               <Image
-                src="/images/hina_profile.JPG?height=400&width=400"
+                src="/images/hina/hina_profile.JPG?height=400&width=400"
                 alt={brideAlt}
                 width={400}
                 height={400}
