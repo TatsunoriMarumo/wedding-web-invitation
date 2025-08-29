@@ -185,7 +185,7 @@ function AllergyInput({
         {showAllergenSelect && (
           <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
             <div className="mb-3">
-              <p className="text-sm text-gray-600 mb-2">一般的なアレルゲン：</p>
+              <p className="text-sm text-gray-600 mb-2">{t("rsvp.form.health.commonAllergens")}</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {COMMON_ALLERGENS.map((allergen) => (
                   <button
@@ -205,7 +205,7 @@ function AllergyInput({
                 type="text"
                 value={customAllergen}
                 onChange={(e) => setCustomAllergen(e.target.value)}
-                placeholder="その他のアレルギー"
+                placeholder={t("rsvp.form.health.foodAllergyPlaceholder")}
                 className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-[100px]"
                 onKeyPress={(e) => {
                   if (e.key === "Enter") {
@@ -229,7 +229,7 @@ function AllergyInput({
                 }}
                 className="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
               >
-                閉じる
+                {t("rsvp.form.health.close")}
               </button>
             </div>
           </div>
@@ -455,7 +455,7 @@ export default function RsvpForm({ token }: { token: string }) {
         {step === 2 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.health")} - ご本人様
+              {t("rsvp.form.steps.health")} - {t("rsvp.form.confirmation.mainGuest")}
             </h3>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -476,7 +476,7 @@ export default function RsvpForm({ token }: { token: string }) {
         {step === 3 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.attendance")} - 同伴者
+              {t("rsvp.form.steps.attendance")} - {t("rsvp.form.companions.label")}
             </h3>
 
             <div className="flex items-center justify-between mb-4">
@@ -496,7 +496,7 @@ export default function RsvpForm({ token }: { token: string }) {
             {formData.companions.length === 0 ? (
               <div className="text-center py-8 bg-gray-50 rounded-lg">
                 <p className="text-gray-500">
-                  同伴者がいない場合は「次へ」をクリックしてください
+                  {t("rsvp.form.companions.noCompanions")}
                 </p>
               </div>
             ) : (
@@ -508,7 +508,7 @@ export default function RsvpForm({ token }: { token: string }) {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-gray-700">
-                        同伴者 {index + 1}
+                        {t("rsvp.form.companions.companionNumber")} {index + 1}
                       </h4>
                       <button
                         type="button"
@@ -552,7 +552,7 @@ export default function RsvpForm({ token }: { token: string }) {
 
                     <input
                       type="email"
-                      placeholder="メールアドレス"
+                      placeholder={t("rsvp.form.companions.emailPlaceholder")}
                       value={companion.email}
                       onChange={(e) =>
                         updateCompanion(companion.id, { email: e.target.value })
@@ -562,7 +562,7 @@ export default function RsvpForm({ token }: { token: string }) {
 
                     <input
                       type="tel"
-                      placeholder="電話番号"
+                      placeholder={t("rsvp.form.companions.phonePlaceholder")}
                       value={companion.phone}
                       onChange={(e) =>
                         updateCompanion(companion.id, { phone: e.target.value })
@@ -572,7 +572,7 @@ export default function RsvpForm({ token }: { token: string }) {
 
                     <div className="border-t pt-4">
                       <h5 className="text-sm font-medium text-gray-700 mb-3">
-                        アレルギー情報
+                        {t("rsvp.form.steps.health")}
                       </h5>
                       <AllergyInput
                         person={companion}
@@ -600,30 +600,30 @@ export default function RsvpForm({ token }: { token: string }) {
               <div className="divide-y divide-gray-200">
                 {/* ご本人様 */}
                 <div className="py-4 first:pt-0 last:pb-0">
-                  <h4 className="font-medium text-gray-700 mb-2">ご本人様</h4>
+                  <h4 className="font-medium text-gray-700 mb-2">{t("rsvp.form.confirmation.mainGuest")}</h4>
                   <div className="space-y-2 text-sm text-gray-800">
                     <div>
                       <span className="font-medium w-20 inline-block">
-                        お名前:
+                        {t("rsvp.form.confirmation.name")}
                       </span>
                       {formData.mainGuest.lastName}{" "}
                       {formData.mainGuest.firstName}
                     </div>
                     <div>
                       <span className="font-medium w-20 inline-block">
-                        メール:
+                        {t("rsvp.form.confirmation.email")}
                       </span>
                       {formData.mainGuest.email}
                     </div>
                     <div>
                       <span className="font-medium w-20 inline-block">
-                        電話:
+                        {t("rsvp.form.confirmation.phone")}
                       </span>
                       {formData.mainGuest.phone}
                     </div>
                     <div>
                       <span className="font-medium w-20 inline-block">
-                        出欠:
+                        {t("rsvp.form.confirmation.attendance")}
                       </span>
                       <span
                         className={
@@ -641,7 +641,7 @@ export default function RsvpForm({ token }: { token: string }) {
                       formData.mainGuest.allergies.length > 0 && (
                         <div className="flex">
                           <span className="font-medium w-20 inline-block flex-shrink-0">
-                            アレルギー:
+                            {t("rsvp.form.confirmation.allergy")}
                           </span>
                           <span className="break-words">
                             {formData.mainGuest.allergies
@@ -661,19 +661,19 @@ export default function RsvpForm({ token }: { token: string }) {
                       className="py-4 first:pt-0 last:pb-0"
                     >
                       <h4 className="font-medium text-gray-700 mb-2">
-                        同伴者{index + 1}
+                        {t("rsvp.form.confirmation.companionGuest")} {index + 1}
                       </h4>
                       <div className="space-y-2 text-sm text-gray-800">
                         <div>
                           <span className="font-medium w-20 inline-block">
-                            お名前:
+                            {t("rsvp.form.confirmation.name")}
                           </span>
                           {companion.lastName} {companion.firstName}
                         </div>
                         {companion.email && (
                           <div>
                             <span className="font-medium w-20 inline-block">
-                              メール:
+                              {t("rsvp.form.confirmation.email")}
                             </span>
                             {companion.email}
                           </div>
@@ -681,7 +681,7 @@ export default function RsvpForm({ token }: { token: string }) {
                         {companion.phone && (
                           <div>
                             <span className="font-medium w-20 inline-block">
-                              電話:
+                              {t("rsvp.form.confirmation.phone")}
                             </span>
                             {companion.phone}
                           </div>
@@ -689,7 +689,7 @@ export default function RsvpForm({ token }: { token: string }) {
                         {companion.allergies.length > 0 && (
                           <div className="flex">
                             <span className="font-medium w-20 inline-block flex-shrink-0">
-                              アレルギー:
+                              {t("rsvp.form.confirmation.allergy")}
                             </span>
                             <span className="break-words">
                               {companion.allergies
@@ -722,7 +722,7 @@ export default function RsvpForm({ token }: { token: string }) {
               type="button"
               onClick={() => {
                 if (step === 1 && !formData.attendance) {
-                  alert("出欠を選択してください");
+                  alert(t("rsvp.form.validation.select"));
                   return;
                 }
                 setStep(step + 1);
