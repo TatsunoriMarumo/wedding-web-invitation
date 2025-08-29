@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, forwardRef } from "react";
 import { useLanguage } from "../providers";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 
@@ -13,26 +13,29 @@ const sections = [
   { id: "gallery", key: "nav.gallery" },
 ];
 
-export default function Header() {
+// propsの型を定義
+interface HeaderProps {
+  headerHeight: number;
+}
+
+const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState("intro");
-  const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-
-      // アクティブセクションの検出
       const sectionElements = sections.map((section) => ({
         id: section.id,
         element: document.getElementById(section.id),
       }));
 
+      // ヘッダーの高さを考慮してアクティブセクションを判定
+      const scrollOffset = headerHeight + 40;
       const currentSection = sectionElements.find(({ element }) => {
         if (!element) return false;
         const rect = element.getBoundingClientRect();
-        return rect.top <= 100 && rect.bottom >= 100;
+        return rect.top <= scrollOffset && rect.bottom >= scrollOffset;
       });
 
       if (currentSection) {
@@ -42,25 +45,38 @@ export default function Header() {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [headerHeight]); // headerHeightが変わった時にも再実行
 
+  // スクロールロジックを更新
   const scrollToSection = (sectionId: string) => {
+    setIsMobileMenuOpen(false); // メニューを閉じる
+
+    // "intro"の場合はページの最上部へスクロール
+    if (sectionId === "intro") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
     const element = document.getElementById(sectionId);
     if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
-      setIsMobileMenuOpen(false);
+      const elementPosition = element.getBoundingClientRect().top;
+      // 現在のスクロール位置 + 要素のビューポート上の位置 - ヘッダーの高さを計算
+      const offsetPosition = elementPosition + window.scrollY - headerHeight;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
     }
   };
 
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          isScrolled
-            ? "bg-white/95 backdrop-blur-md shadow-lg py-2"
-            : "bg-transparent py-4"
-        }`}
+        ref={ref}
+        className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white/95 backdrop-blur-md shadow-lg py-2"
       >
+        {/* ...（ここの中身は変更なし）... */}
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between">
             <div className="hidden md:flex items-center space-x-2">
@@ -108,6 +124,7 @@ export default function Header() {
         </div>
       </header>
 
+      {/* ...（モバイルメニュー部分は変更なし）... */}
       <div
         className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
           isMobileMenuOpen
@@ -115,13 +132,10 @@ export default function Header() {
             : "opacity-0 pointer-events-none"
         }`}
       >
-        {/* オーバーレイ */}
         <div
           className="absolute inset-0 bg-black/50"
           onClick={() => setIsMobileMenuOpen(false)}
         />
-
-        {/* メニューパネル */}
         <div
           className={`absolute top-0 left-0 w-80 max-w-[80vw] h-full bg-white shadow-2xl transform transition-transform duration-300 ${
             isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -142,8 +156,6 @@ export default function Header() {
                   {t(section.key)}
                 </button>
               ))}
-
-              {/* モバイル用RSVPボタン */}
               <button
                 onClick={() => scrollToSection("rsvp")}
                 className="w-full bg-orange-400 hover:bg-orange-500 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 mt-6"
@@ -156,4 +168,7 @@ export default function Header() {
       </div>
     </>
   );
-}
+});
+
+Header.displayName = "Header";
+export default Header;
