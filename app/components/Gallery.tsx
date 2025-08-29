@@ -132,8 +132,11 @@ export default function Gallery() {
         <h2 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-4 font-klee">
           {t("gallery.title")}
         </h2>
-        <p className="text-lg text-gray-600 mb-6 font-klee">
+        <p className="text-lg text-gray-600 font-klee">
           {t("gallery.subtitle")}
+        </p>
+        <p className="text-gray-600 mb-6 font-klee">
+          {t("gallery.tap")}
         </p>
         <div className="w-24 h-1 bg-gradient-to-r from-pink-400 to-orange-400 mx-auto rounded-full" />
       </div>

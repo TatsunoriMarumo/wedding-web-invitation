@@ -180,7 +180,8 @@ export const ja = {
   },
   gallery: {
     title: "ギャラリー",
-    subtitle: "私たちの思い出の写真をご覧ください",
+    subtitle: "私たちの思い出の写真をご覧ください♪",
+    tap: "(タップで画像を拡大できます)",
     images: [
       "エアビーでピザパ in Canada",
       "シアトルのクラムチャウダー",
