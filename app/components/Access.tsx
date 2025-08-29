@@ -172,7 +172,6 @@ export default function Access() {
               <p>{t("access.eventCard.date")}</p>
               <p>{t("access.eventCard.reception")}</p>
               <p>{t("access.eventCard.contact")}</p>
-              <p>{t("access.eventCard.dresscode")}</p>
             </div>
 
             <div className="flex space-x-2 mt-4">
