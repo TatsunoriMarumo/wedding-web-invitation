@@ -1,7 +1,5 @@
-"use client"; // DOM操作のためクライアントコンポーネントに
-
-import { Suspense, useState, useRef, useEffect } from "react";
-import Header from "./components/Header";
+import { Suspense } from "react";
+import ClientWrapper from "./components/ClientWrapper";
 import Hero from "./components/Hero";
 import CoupleProfile from "./components/CoupleProfile";
 import DressCode from "./components/DressCode";
@@ -13,33 +11,8 @@ import SectionDivider from "./components/SectionDivider";
 import Greeting from "./components/Greeting";
 
 export default function Home() {
-  const [headerHeight, setHeaderHeight] = useState(0);
-  const headerRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const updateHeaderHeight = () => {
-      if (headerRef.current) {
-        setHeaderHeight(headerRef.current.offsetHeight);
-      }
-    };
-
-    // 初回レンダリング時とウィンドウリサイズ時に高さを更新
-    updateHeaderHeight();
-    window.addEventListener("resize", updateHeaderHeight);
-
-    // クリーンアップ関数
-    return () => window.removeEventListener("resize", updateHeaderHeight);
-  }, []);
-
   return (
-    // 静的なpt-20を削除し、style属性で動的にpaddingTopを設定
-    <main
-      className="min-h-screen bg-gradient-to-b from-sky-50 to-white"
-      style={{ paddingTop: `${headerHeight}px` }}
-    >
-      {/* 作成したrefをHeaderコンポーネントに渡す */}
-      <Header ref={headerRef} headerHeight={headerHeight} />
-
+    <ClientWrapper>
       <section id="intro">
         <Hero />
       </section>
@@ -87,6 +60,6 @@ export default function Home() {
       </section>
 
       <Footer />
-    </main>
+    </ClientWrapper>
   );
 }
