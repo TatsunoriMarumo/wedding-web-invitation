@@ -24,7 +24,9 @@ type DottedPaths<T, Prev extends string = ""> = T extends readonly any[]
   : Prev;
 
 type NonEmpty<T> = T extends "" ? never : T;
-type TranslationKey = NonEmpty<DottedPaths<TranslationSchema>>;
+
+/** 他ファイルでも使うために export します */
+export type TranslationKey = NonEmpty<DottedPaths<TranslationSchema>>;
 
 type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
   ? K extends keyof T
@@ -40,7 +42,7 @@ type ValueOfKey<K extends TranslationKey> = PathValue<TranslationSchema, K>;
 interface LanguageContextType {
   t: <K extends TranslationKey>(
     key: K,
-    _opts?: { returnObjects?: boolean } 
+    _opts?: { returnObjects?: boolean }
   ) => ValueOfKey<K>;
   language: Language;
 }
@@ -62,10 +64,13 @@ export function Providers({ children }: { children: ReactNode }) {
 
   // t はキー型に応じた厳密な返り値型を維持
   const t = useCallback(
-    <K extends TranslationKey>(key: K): ValueOfKey<K> => {
+    <K extends TranslationKey>(
+      key: K,
+      _opts?: { returnObjects?: boolean }
+    ): ValueOfKey<K> => {
       const v = getNestedValue(translations[language], key as string);
       if (process.env.NODE_ENV !== "production" && v == null) {
-        // 開発時にだけ warn（本番では無音）
+        // 開発時のみ warn（本番では無音）
         console.warn(`[i18n] Missing key: ${String(key)} (lang=${language})`);
       }
       // 未定義ならキー文字列をそのまま返す（型は安全にキャスト）

@@ -2,8 +2,10 @@
 
 import { useState, useEffect, forwardRef } from "react";
 import { useLanguage } from "../providers";
+import type { TranslationKey } from "../providers";
 import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 
+// 翻訳キーをリテラルで固定しつつ、型で保証する
 const sections = [
   { id: "intro", key: "nav.intro" },
   { id: "profile", key: "nav.profile" },
@@ -11,16 +13,19 @@ const sections = [
   { id: "rsvp", key: "nav.rsvp" },
   { id: "access", key: "nav.access" },
   { id: "gallery", key: "nav.gallery" },
-];
+] as const satisfies readonly { id: string; key: TranslationKey }[];
 
-// propsの型を定義
+// id ユニオンを抽出
+type SectionId = (typeof sections)[number]["id"];
+
+// props の型
 interface HeaderProps {
   headerHeight: number;
 }
 
 const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState("intro");
+  const [activeSection, setActiveSection] = useState<SectionId>("intro");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -45,13 +50,13 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
 
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [headerHeight]); // headerHeightが変わった時にも再実行
+  }, [headerHeight]);
 
-  // スクロールロジックを更新
-  const scrollToSection = (sectionId: string) => {
+  // スクロールロジック
+  const scrollToSection = (sectionId: SectionId) => {
     setIsMobileMenuOpen(false); // メニューを閉じる
 
-    // "intro"の場合はページの最上部へスクロール
+    // "intro" は最上部へ
     if (sectionId === "intro") {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -60,7 +65,6 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
     const element = document.getElementById(sectionId);
     if (element) {
       const elementPosition = element.getBoundingClientRect().top;
-      // 現在のスクロール位置 + 要素のビューポート上の位置 - ヘッダーの高さを計算
       const offsetPosition = elementPosition + window.scrollY - headerHeight;
 
       window.scrollTo({
@@ -76,9 +80,9 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
         ref={ref}
         className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white/95 backdrop-blur-md shadow-lg py-2"
       >
-        {/* ...（ここの中身は変更なし）... */}
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between">
+            {/* デスクトップのナビ */}
             <div className="hidden md:flex items-center space-x-2">
               {sections.map((section) => (
                 <button
@@ -95,6 +99,7 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
               ))}
             </div>
 
+            {/* モバイル：メニューボタン */}
             <div className="md:hidden flex items-center">
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -108,10 +113,12 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
               </button>
             </div>
 
+            {/* 中央タイトル（モバイルのみ） */}
             <div className="md:hidden absolute left-1/2 transform -translate-x-1/2">
               <h1 className="text-lg font-semibold text-gray-800">Wedding</h1>
             </div>
 
+            {/* 右側 CTA */}
             <div className="flex items-center">
               <button
                 onClick={() => scrollToSection("rsvp")}
@@ -124,7 +131,7 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
         </div>
       </header>
 
-      {/* ...（モバイルメニュー部分は変更なし）... */}
+      {/* モバイルメニュー */}
       <div
         className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
           isMobileMenuOpen
