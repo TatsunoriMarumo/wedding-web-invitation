@@ -12,7 +12,7 @@ import { translations, getNestedValue, type Language } from "../lib/i18n";
 /** ===== 型ユーティリティ（配列は葉で打ち切り） ===== */
 type TranslationSchema = (typeof translations)[keyof typeof translations];
 
-type DottedPaths<T, Prev extends string = ""> = T extends readonly any[]
+type DottedPaths<T, Prev extends string = ""> = T extends readonly unknown[]
   ? Prev
   : T extends object
   ? {
