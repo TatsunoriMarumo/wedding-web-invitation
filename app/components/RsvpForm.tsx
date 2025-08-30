@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useLanguage } from "../providers";
 import { useFormStatus } from "react-dom";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { submitRsvp } from "@/app/rsvp/actions";
 
 interface AllergyItem {
   id: string;
@@ -20,13 +21,12 @@ interface Person {
   allergies: AllergyItem[];
 }
 
-interface FormData {
+interface RsvpFormState {
   mainGuest: Person;
   attendance: "attend" | "decline" | "";
   companions: Person[];
 }
 
-// 一般的な食物アレルゲンのプリセット
 const COMMON_ALLERGENS = [
   "卵",
   "乳製品",
@@ -71,7 +71,7 @@ function AllergyInput({
 
   const setDogAllergy = (value: boolean) => {
     const has = person.allergies.some((a) => a.type === "dog");
-    if (value === has) return; // すでに同じ状態なら何もしない
+    if (value === has) return;
 
     if (value) {
       const newAllergy: AllergyItem = {
@@ -84,14 +84,12 @@ function AllergyInput({
       onUpdate(person.allergies.filter((a) => a.type !== "dog"));
     }
   };
+
   const addFoodAllergy = (allergen: string) => {
     if (!allergen.trim()) return;
-
-    // 既に同じアレルゲンが登録されているかチェック
     const exists = person.allergies.some(
       (a) => a.type === "food" && a.allergen === allergen
     );
-
     if (!exists) {
       const newAllergy: AllergyItem = {
         id: Date.now().toString(),
@@ -100,7 +98,6 @@ function AllergyInput({
       };
       onUpdate([...person.allergies, newAllergy]);
     }
-
     setCustomAllergen("");
     setShowAllergenSelect(false);
   };
@@ -119,7 +116,7 @@ function AllergyInput({
         <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => setDogAllergy(false)} // ← いいえ固定
+            onClick={() => setDogAllergy(false)}
             aria-pressed={!hasDogAllergy}
             className={`p-3 rounded-lg border-2 transition-all text-sm ${
               !hasDogAllergy
@@ -131,7 +128,7 @@ function AllergyInput({
           </button>
           <button
             type="button"
-            onClick={() => setDogAllergy(true)} // ← はい固定
+            onClick={() => setDogAllergy(true)}
             aria-pressed={hasDogAllergy}
             className={`p-3 rounded-lg border-2 transition-all text-sm ${
               hasDogAllergy
@@ -160,7 +157,6 @@ function AllergyInput({
           </button>
         </div>
 
-        {/* アレルギー一覧 */}
         {foodAllergies.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {foodAllergies.map((allergy) => (
@@ -181,11 +177,12 @@ function AllergyInput({
           </div>
         )}
 
-        {/* アレルゲン選択モーダル */}
         {showAllergenSelect && (
           <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
             <div className="mb-3">
-              <p className="text-sm text-gray-600 mb-2">{t("rsvp.form.health.commonAllergens")}</p>
+              <p className="text-sm text-gray-600 mb-2">
+                {t("rsvp.form.health.commonAllergens")}
+              </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {COMMON_ALLERGENS.map((allergen) => (
                   <button
@@ -242,7 +239,7 @@ function AllergyInput({
 export default function RsvpForm({ token }: { token: string }) {
   const { t } = useLanguage();
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState<RsvpFormState>({
     mainGuest: {
       id: "main",
       firstName: "",
@@ -293,34 +290,22 @@ export default function RsvpForm({ token }: { token: string }) {
     }));
   };
 
-  const handleSubmit = async (formDataObj: FormData) => {
-    // データベース保存用のフォーマットに変換
-    const submitData = {
-      token,
-      attendance: formData.attendance,
-      guests: [
-        {
-          ...formData.mainGuest,
-          isMainGuest: true,
-        },
-        ...formData.companions.map((c) => ({
-          ...c,
-          isMainGuest: false,
-        })),
-      ],
-    };
-
-    console.log("Submitting normalized data:", submitData);
-    // サーバーアクションを呼び出し
-  };
-
-  // 欠席の場合は2ステップ、出席の場合は4ステップ
   const totalSteps = formData.attendance === "decline" ? 2 : 4;
   const currentStepNumber = step > totalSteps ? totalSteps : step;
 
+  // Server Action に渡すペイロード（hidden input 経由）
+  const payload = JSON.stringify({
+    token,
+    attendance: formData.attendance,
+    guests: [
+      { ...formData.mainGuest, isMainGuest: true },
+      ...formData.companions.map((c) => ({ ...c, isMainGuest: false })),
+    ],
+  });
+
   return (
     <div className="max-w-3xl mx-auto">
-      {/* 進捗インジケーター */}
+      {/* 進捗 */}
       <div className="flex items-center justify-center mb-8">
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center">
@@ -345,10 +330,13 @@ export default function RsvpForm({ token }: { token: string }) {
       </div>
 
       <form
-        action={handleSubmit}
+        action={submitRsvp}
         className="bg-white rounded-2xl shadow-lg p-6 sm:p-8"
       >
-        {/* Step 1: 基本情報と出欠 */}
+        {/* ★ サーバーへ渡す JSON を hidden で同送 */}
+        <input type="hidden" name="payload" value={payload} readOnly />
+
+        {/* Step 1 */}
         {step === 1 && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
@@ -422,7 +410,7 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() =>
-                    setFormData((prev) => ({ ...prev, attendance: "attend" }))
+                    setFormData((p) => ({ ...p, attendance: "attend" }))
                   }
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.attendance === "attend"
@@ -436,7 +424,7 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() =>
-                    setFormData((prev) => ({ ...prev, attendance: "decline" }))
+                    setFormData((p) => ({ ...p, attendance: "decline" }))
                   }
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.attendance === "decline"
@@ -451,11 +439,12 @@ export default function RsvpForm({ token }: { token: string }) {
           </div>
         )}
 
-        {/* Step 2: 招待者本人のアレルギー情報（出席時のみ） */}
+        {/* Step 2: 本人アレルギー（出席のみ） */}
         {step === 2 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.health")} - {t("rsvp.form.confirmation.mainGuest")}
+              {t("rsvp.form.steps.health")} -{" "}
+              {t("rsvp.form.confirmation.mainGuest")}
             </h3>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
@@ -472,11 +461,12 @@ export default function RsvpForm({ token }: { token: string }) {
           </div>
         )}
 
-        {/* Step 3: 同伴者情報（出席時のみ） */}
+        {/* Step 3: 同伴者（出席のみ） */}
         {step === 3 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.attendance")} - {t("rsvp.form.companions.label")}
+              {t("rsvp.form.steps.attendance")} -{" "}
+              {t("rsvp.form.companions.label")}
             </h3>
 
             <div className="flex items-center justify-between mb-4">
@@ -588,7 +578,7 @@ export default function RsvpForm({ token }: { token: string }) {
           </div>
         )}
 
-        {/* Step 4 (出席) or Step 2 (欠席): 確認画面 */}
+        {/* Step 4(出席) / Step 2(欠席): 確認 */}
         {((step === 4 && formData.attendance === "attend") ||
           (step === 2 && formData.attendance === "decline")) && (
           <div className="space-y-6">
@@ -598,9 +588,10 @@ export default function RsvpForm({ token }: { token: string }) {
 
             <div className="bg-gray-50 rounded-xl p-6">
               <div className="divide-y divide-gray-200">
-                {/* ご本人様 */}
                 <div className="py-4 first:pt-0 last:pb-0">
-                  <h4 className="font-medium text-gray-700 mb-2">{t("rsvp.form.confirmation.mainGuest")}</h4>
+                  <h4 className="font-medium text-gray-700 mb-2">
+                    {t("rsvp.form.confirmation.mainGuest")}
+                  </h4>
                   <div className="space-y-2 text-sm text-gray-800">
                     <div>
                       <span className="font-medium w-20 inline-block">
@@ -653,7 +644,6 @@ export default function RsvpForm({ token }: { token: string }) {
                   </div>
                 </div>
 
-                {/* 同伴者 */}
                 {formData.attendance === "attend" &&
                   formData.companions.map((companion, index) => (
                     <div
@@ -722,7 +712,7 @@ export default function RsvpForm({ token }: { token: string }) {
               type="button"
               onClick={() => {
                 if (step === 1 && !formData.attendance) {
-                  alert(t("rsvp.form.validation.select"));
+                  alert(t("rsvp.form.validation.selectAttendance"));
                   return;
                 }
                 setStep(step + 1);
