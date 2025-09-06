@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================
+// Enums
+// ============================
+
+enum AttendanceStatus {
+  ATTEND   // 出席
+  DECLINE  // 欠席
+}
+
+enum AllergenCategory {
+  DOG      // 犬アレルギー
+  FOOD     // 食物アレルギー（卵/乳/小麦/…＋任意追加）
+}
+
+// ============================
+// Models
+// ============================
+
+/**
+ * 参加者（代表/同伴の概念なし。全員が独立レコード）
+ * 出欠は参加者単位で保持。
+ */
+model Guest {
+  id             Int               @id @default(autoincrement())
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  attendance     AttendanceStatus
+
+  // どの招待トークンから回答したか（任意）。
+  // 1トークン=1回答の制約を守るため unique。
+  invitationTokenId Int?              @unique
+  invitationToken   InvitationToken?  @relation(fields: [invitationTokenId], references: [id], onDelete: SetNull)
+
+  allergies      GuestAllergy[]    // 多対多（中間テーブル）
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([lastName, firstName])
+  @@index([attendance])
+}
+
+/**
+ * 招待トークン（最小要件：宛名＋使用済みフラグ）
+ * トークン使用時に isUsed を true、usedAt をセット。
+ */
+model InvitationToken {
+  id               Int       @id @default(autoincrement())
+  token            String    @unique
+  inviteeFirstName String
+  inviteeLastName  String
+  isUsed           Boolean   @default(false)
+  usedAt           DateTime?
+
+  // 1:1 の back-relation（このトークンで回答したゲスト）
+  guest            Guest?
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([isUsed])
+  @@index([inviteeLastName, inviteeFirstName])
+}
+
+/**
+ * アレルゲンのマスタ（「犬」は {category:DOG, name:"犬"} で1件）
+ * 食物は {category:FOOD, name:"卵"} のように増やす
+ */
+model Allergen {
+  id         Int              @id @default(autoincrement())
+  category   AllergenCategory
+  name       String
+  guests     GuestAllergy[]
+
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([category, name])  // 同カテゴリ内で名称一意
+  @@index([category])
+}
+
+/**
+ * 参加者 × アレルゲン（多対多の中間表）
+ * 1人が同じアレルゲンを重複登録できないよう複合主キー。
+ */
+model GuestAllergy {
+  guestId     Int
+  allergenId  Int
+  notedAt     DateTime @default(now())
+
+  guest       Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  allergen    Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+
+  @@id([guestId, allergenId])
+  @@index([allergenId])
+}
