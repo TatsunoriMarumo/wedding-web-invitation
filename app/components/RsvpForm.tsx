@@ -21,6 +21,11 @@ interface Person {
   allergies: AllergyItem[];
 }
 
+/**
+ * フォーム内部のUI構造は従来どおり mainGuest / companions を保持しますが、
+ * 送信時は全員を同列の guests 配列として渡します（役割フラグは付与しない）。
+ * サーバでは「guests[0] が代表者」という前提で必要なら mainGuestId を設定してください。
+ */
 interface RsvpFormState {
   mainGuest: Person;
   attendance: "attend" | "decline" | "";
@@ -293,14 +298,17 @@ export default function RsvpForm({ token }: { token: string }) {
   const totalSteps = formData.attendance === "decline" ? 2 : 4;
   const currentStepNumber = step > totalSteps ? totalSteps : step;
 
+  // >>> 送信ペイロード：全員を独立のゲストとして扱う（役割フラグなし）
+  const guests =
+    formData.attendance === "attend"
+      ? [formData.mainGuest, ...formData.companions]
+      : [formData.mainGuest];
+
   // Server Action に渡すペイロード（hidden input 経由）
   const payload = JSON.stringify({
     token,
     attendance: formData.attendance,
-    guests: [
-      { ...formData.mainGuest, isMainGuest: true },
-      ...formData.companions.map((c) => ({ ...c, isMainGuest: false })),
-    ],
+    guests, // ← isMainGuest を廃止し、順序のみで代表者を示す（guests[0]）
   });
 
   return (
@@ -443,14 +451,12 @@ export default function RsvpForm({ token }: { token: string }) {
         {step === 2 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.health")} -{" "}
-              {t("rsvp.form.confirmation.mainGuest")}
+              {t("rsvp.form.steps.health")} - {t("rsvp.form.confirmation.mainGuest")}
             </h3>
 
             <div className="bg-gray-50 rounded-lg p-4 mb-4">
               <p className="text-sm text-gray-600">
-                {formData.mainGuest.lastName} {formData.mainGuest.firstName}{" "}
-                様のアレルギー情報
+                {formData.mainGuest.lastName} {formData.mainGuest.firstName} 様のアレルギー情報
               </p>
             </div>
 
@@ -465,8 +471,7 @@ export default function RsvpForm({ token }: { token: string }) {
         {step === 3 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.attendance")} -{" "}
-              {t("rsvp.form.companions.label")}
+              {t("rsvp.form.steps.attendance")} - {t("rsvp.form.companions.label")}
             </h3>
 
             <div className="flex items-center justify-between mb-4">
@@ -513,28 +518,20 @@ export default function RsvpForm({ token }: { token: string }) {
                       <input
                         type="text"
                         required
-                        placeholder={`${t(
-                          "rsvp.form.companions.lastnamePlaceholder"
-                        )} *`}
+                        placeholder={`${t("rsvp.form.companions.lastnamePlaceholder")} *`}
                         value={companion.lastName}
                         onChange={(e) =>
-                          updateCompanion(companion.id, {
-                            lastName: e.target.value,
-                          })
+                          updateCompanion(companion.id, { lastName: e.target.value })
                         }
                         className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                       />
                       <input
                         type="text"
                         required
-                        placeholder={`${t(
-                          "rsvp.form.companions.firstnamePlaceholder"
-                        )} *`}
+                        placeholder={`${t("rsvp.form.companions.firstnamePlaceholder")} *`}
                         value={companion.firstName}
                         onChange={(e) =>
-                          updateCompanion(companion.id, {
-                            firstName: e.target.value,
-                          })
+                          updateCompanion(companion.id, { firstName: e.target.value })
                         }
                         className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                       />
@@ -597,8 +594,7 @@ export default function RsvpForm({ token }: { token: string }) {
                       <span className="font-medium w-20 inline-block">
                         {t("rsvp.form.confirmation.name")}
                       </span>
-                      {formData.mainGuest.lastName}{" "}
-                      {formData.mainGuest.firstName}
+                      {formData.mainGuest.lastName} {formData.mainGuest.firstName}
                     </div>
                     <div>
                       <span className="font-medium w-20 inline-block">
@@ -646,10 +642,7 @@ export default function RsvpForm({ token }: { token: string }) {
 
                 {formData.attendance === "attend" &&
                   formData.companions.map((companion, index) => (
-                    <div
-                      key={companion.id}
-                      className="py-4 first:pt-0 last:pb-0"
-                    >
+                    <div key={companion.id} className="py-4 first:pt-0 last:pb-0">
                       <h4 className="font-medium text-gray-700 mb-2">
                         {t("rsvp.form.confirmation.companionGuest")} {index + 1}
                       </h4>
@@ -682,9 +675,7 @@ export default function RsvpForm({ token }: { token: string }) {
                               {t("rsvp.form.confirmation.allergy")}
                             </span>
                             <span className="break-words">
-                              {companion.allergies
-                                .map((a) => a.allergen)
-                                .join("、")}
+                              {companion.allergies.map((a) => a.allergen).join("、")}
                             </span>
                           </div>
                         )}

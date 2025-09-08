@@ -46,7 +46,7 @@ model Guest {
 
   // どの招待トークンから回答したか（任意）。
   // 1トークン=1回答の制約を守るため unique。
-  invitationTokenId Int?              @unique
+  invitationTokenId Int?  
   invitationToken   InvitationToken?  @relation(fields: [invitationTokenId], references: [id], onDelete: SetNull)
 
   allergies      GuestAllergy[]    // 多対多（中間テーブル）
@@ -56,6 +56,7 @@ model Guest {
 
   @@index([lastName, firstName])
   @@index([attendance])
+  @@index([invitationTokenId])
 }
 
 /**
@@ -69,8 +70,8 @@ model InvitationToken {
   isUsed           Boolean   @default(false)
   usedAt           DateTime?
 
-  // 1:1 の back-relation（このトークンで回答したゲスト）
-  guest            Guest?
+  // 1:N の back-relation（このトークンで回答したゲスト）
+  guest            Guest[]
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
