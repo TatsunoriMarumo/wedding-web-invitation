@@ -65,8 +65,7 @@ model Guest {
 model InvitationToken {
   id               Int       @id @default(autoincrement())
   token            String    @unique
-  inviteeFirstName String
-  inviteeLastName  String
+  inviteeName      String
   isUsed           Boolean   @default(false)
   usedAt           DateTime?
 
@@ -77,7 +76,7 @@ model InvitationToken {
   updatedAt        DateTime  @updatedAt
 
   @@index([isUsed])
-  @@index([inviteeLastName, inviteeFirstName])
+  @@index([inviteeName])
 }
 
 /**
