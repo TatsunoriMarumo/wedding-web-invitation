@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../lib/generated/prisma"
 }
 
 datasource db {
@@ -93,7 +92,7 @@ model Allergen {
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
-  @@unique([category, name])  // 同カテゴリ内で名称一意
+  @@unique([category, name], name: "category_name")  // 同カテゴリ内で名称一意
   @@index([category])
 }
 
