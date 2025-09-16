@@ -11,7 +11,7 @@ export default function RsvpSection() {
   const token = searchParams.get("token");
 
   // トークン検証（実際の実装では、サーバーサイドで検証）
-  const isValidToken = token && token.length > 10;
+  const isValidToken = token;
 
   if (!isValidToken) {
     return (
