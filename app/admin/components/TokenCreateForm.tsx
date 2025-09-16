@@ -4,9 +4,9 @@
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { createInvitationToken } from "../actions";
+import { createInvitationToken, type TokenActionState } from "../actions"; // ここで型だけimportしてOK（型はビルド時に消える）
 import { useLanguage } from "@/app/providers";
-import { InviteToken } from "@/lib/types";
+import type { InviteToken } from "@/lib/types";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -32,33 +32,25 @@ export function TokenCreateForm({
   addOptimisticToken: (newToken: InviteToken) => void;
 }) {
   const { t } = useLanguage();
-  const [state, formAction] = useActionState(createInvitationToken, {
-    message: null,
-    token: null,
-  });
+
+  // ---- 状態の型を明示（第二型引数に FormData） ----
+  const [state, formAction] = useActionState<TokenActionState, FormData>(
+    createInvitationToken,
+    { message: null, token: null }
+  );
 
   useEffect(() => {
     if (state?.message === "success" && state.token) {
-        const form = document.getElementById("token-create-form-modal") as HTMLFormElement;
-        const inviteeName = (form.elements.namedItem("inviteeName") as HTMLInputElement)?.value || "";
-        const optimisticToken: InviteToken = {
-            id: Math.random(),
-            token: state.token,
-            inviteeName,
-            isUsed: false,
-            createdAt: new Date().toISOString(),
-        };
-        addOptimisticToken(optimisticToken);
-        onSuccess(optimisticToken);
-        onClose();
+      // サーバが返した InviteToken をそのまま使う（stringではない）
+      addOptimisticToken(state.token);
+      onSuccess(state.token);
+      onClose();
     }
   }, [state, onSuccess, onClose, addOptimisticToken]);
 
   return (
-    // 背景オーバーレイ
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      {/* モーダル本体 */}
-      <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full p-6 shadow-xl relative">
         <form id="token-create-form-modal" action={formAction}>
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-semibold text-gray-800">
@@ -89,13 +81,13 @@ export function TokenCreateForm({
               placeholder={t("admin.tokens.inviteeNamePlaceholder")}
             />
           </div>
-          
+
           {state?.message && state.message !== "success" && (
-             <p className="text-sm text-red-500 mt-2">{state.message}</p>
+            <p className="text-sm text-red-500 mt-2">{state.message}</p>
           )}
 
           <div className="flex flex-col-reverse sm:flex-row sm:justify-end items-center gap-3 mt-6 pt-4">
-             <button
+            <button
               type="button"
               onClick={onClose}
               className="w-full sm:w-auto px-6 py-2 border border-gray-300 text-gray-700 font-semibold rounded-md hover:bg-gray-50 transition-colors"
