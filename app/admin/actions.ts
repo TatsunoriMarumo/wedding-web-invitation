@@ -12,7 +12,7 @@ export type TokenActionState = {
   token: InviteToken | null;
 };
 
-// 既存: 管理画面データ取得（あなたの最新版のままでOK）
+// 既存: 管理画面データ取得
 export async function getAdminData() {
   noStore();
   try {
@@ -57,7 +57,7 @@ export async function getAdminData() {
   }
 }
 
-// 既存: 招待トークン作成を「固定状態型」で返すように変更
+// 既存: 招待トークン作成
 export async function createInvitationToken(
   prevState: TokenActionState,
   formData: FormData
@@ -99,5 +99,41 @@ export async function createInvitationToken(
   } catch (e) {
     console.error("createInvitationToken failed:", e);
     return { message: "トークンの作成に失敗しました。", token: null };
+  }
+}
+
+// 新規追加: 招待トークン削除
+export async function deleteInvitationToken(tokenId: number): Promise<{ success: boolean; message: string }> {
+  try {
+    // トークンが使用済みかチェック
+    const token = await prisma.invitationToken.findUnique({
+      where: { id: tokenId },
+      include: { guests: true }
+    });
+
+    if (!token) {
+      return { success: false, message: "トークンが見つかりません。" };
+    }
+
+    if (token.isUsed || token.guests.length > 0) {
+      return { 
+        success: false, 
+        message: "使用済みのトークンは削除できません。" 
+      };
+    }
+
+    // トークンを削除
+    await prisma.invitationToken.delete({
+      where: { id: tokenId }
+    });
+
+    revalidatePath("/admin");
+    return { success: true, message: "トークンを削除しました。" };
+  } catch (error) {
+    console.error("deleteInvitationToken failed:", error);
+    return { 
+      success: false, 
+      message: "トークンの削除に失敗しました。" 
+    };
   }
 }

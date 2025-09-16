@@ -26,21 +26,34 @@ export function AdminDashboard({
 
   const [optimisticTokens, addOptimisticToken] = useOptimistic(
     tokens,
-    (state, newToken: InviteToken) => [
-      // 新しいトークンをリストの先頭に追加
-      { ...newToken, id: state.length > 0 ? Math.max(...state.map(t => t.id)) + 1 : 1 },
-      ...state
-    ]
+    (state, action: { type: "add" | "delete"; token?: InviteToken; tokenId?: number }) => {
+      if (action.type === "add" && action.token) {
+        return [
+          { ...action.token, id: state.length > 0 ? Math.max(...state.map(t => t.id)) + 1 : 1 },
+          ...state
+        ];
+      } else if (action.type === "delete" && action.tokenId !== undefined) {
+        return state.filter(t => t.id !== action.tokenId);
+      }
+      return state;
+    }
   );
 
   const handleSuccess = (newToken: InviteToken) => {
     // Server Actionが成功したら、実際のデータでStateを更新
-     setTokens((prev) => [newToken, ...prev]);
+    setTokens((prev) => [newToken, ...prev]);
+  };
+
+  const handleTokenDeleted = (tokenId: number) => {
+    // 楽観的更新を適用
+    addOptimisticToken({ type: "delete", tokenId });
+    // 実際のStateも更新
+    setTokens((prev) => prev.filter(t => t.id !== tokenId));
   };
 
   const exportToExcel = () => {
     // (CSVエクスポート機能は変更なし)
-     const csvContent = [
+    const csvContent = [
       ["姓", "名", "メールアドレス", "電話番号", "出欠", "アレルギー", "登録日時"],
       ...guests.map((guest) => [
         guest.lastName,
@@ -80,6 +93,7 @@ export function AdminDashboard({
           <TokenTable
             tokens={optimisticTokens}
             onNewClick={() => setIsCreateDialogOpen(true)}
+            onTokenDeleted={handleTokenDeleted}
           />
         </TabsContent>
 
@@ -95,7 +109,7 @@ export function AdminDashboard({
         <TokenCreateForm
           onClose={() => setIsCreateDialogOpen(false)}
           onSuccess={handleSuccess}
-          addOptimisticToken={addOptimisticToken}
+          addOptimisticToken={(token: InviteToken) => addOptimisticToken({ type: "add", token })}
         />
       )}
     </>
