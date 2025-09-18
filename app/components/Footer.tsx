@@ -12,10 +12,10 @@ export default function Footer() {
         <div className="text-center mb-12">
           <div className="flex items-center justify-center space-x-2 mb-4">
             <HeartIcon className="w-8 h-8 text-pink-400" />
-            <h3 className="text-2xl font-semibold">{t("footer.title")}</h3>
+            <h3 className="text-2xl font-semibold whitespace-pre-line">{t("footer.title")}</h3>
             <HeartIcon className="w-8 h-8 text-pink-400" />
           </div>
-          <p className="text-gray-300 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-gray-300 max-w-2xl mx-auto leading-relaxed whitespace-pre-line">
             {t("footer.message")}
           </p>
         </div>

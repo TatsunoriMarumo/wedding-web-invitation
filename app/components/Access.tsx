@@ -45,11 +45,11 @@ export default function Access() {
             <p className="text-gray-600 mb-4">{t("access.venue.address")}</p>
 
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center space-x-2 text-red-700">
+              <div className="flex items-center space-x-2 text-red-700 justify-center">
                 <TruckIcon className="w-5 h-5" />
                 <span className="font-medium">{t("access.parking.title")}</span>
               </div>
-              <p className="text-red-600 text-sm mt-1">
+              <p className="text-center text-red-600 text-sm mt-1 whitespace-pre-line">
                 {t("access.parking.notice")}
               </p>
             </div>
@@ -107,11 +107,11 @@ export default function Access() {
                   </div>
                 </div>
 
-                <p className="text-gray-700 mb-4">
+                <p className="text-gray-700 mb-4 whitespace-pre-line">
                   {t("access.walkAccess.description")}
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-2 whitespace-pre-line">
                   {t("access.walkAccess.details").map(
                     (detail: string, index: number) => (
                       <div key={index} className="flex items-start space-x-3">
@@ -148,11 +148,11 @@ export default function Access() {
                   </div>
                 </div>
 
-                <p className="text-gray-700 mb-4">
+                <p className="text-gray-700 mb-4 whitespace-pre-line">
                   {t("access.taxiAccess.description")}
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-2 whitespace-pre-line">
                   {t("access.taxiAccess.details").map(
                     (detail: string, index: number) => (
                       <div key={index} className="flex items-start space-x-3">
