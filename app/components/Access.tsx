@@ -27,11 +27,15 @@ export default function Access() {
         {/* 地図 */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="h-80 bg-gray-200 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <MapPinIcon className="w-12 h-12 mx-auto mb-2" />
-              <p>Google Map</p>
-              <p className="text-sm">（実装時にGoogle Maps APIを使用）</p>
-            </div>
+            <iframe
+                title="venue-map"
+                src={`https://www.google.com/maps?q=%E3%80%92531-6101%20%E5%A4%A7%E9%98%AA%E5%B8%82%E5%8C%97%E5%8C%BA%E5%A4%A7%E6%B7%80%E4%B8%AD1-8-30&output=embed`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
           </div>
 
           <div className="p-6">
