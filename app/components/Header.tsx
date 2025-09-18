@@ -11,6 +11,7 @@ const sections = [
   { id: "profile", key: "nav.profile" },
   { id: "dresscode", key: "nav.dresscode" },
   { id: "rsvp", key: "nav.rsvp" },
+  { id: "gift", key: "nav.gift" },
   { id: "access", key: "nav.access" },
   { id: "gallery", key: "nav.gallery" },
 ] as const satisfies readonly { id: string; key: TranslationKey }[];
