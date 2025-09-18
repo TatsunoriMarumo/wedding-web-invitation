@@ -9,6 +9,7 @@ import Gallery from "./components/Gallery";
 import Footer from "./components/Footer";
 import SectionDivider from "./components/SectionDivider";
 import Greeting from "./components/Greeting";
+import GiftSection from "./components/GifrSection";
 
 export default function Home() {
   return (
@@ -45,6 +46,12 @@ export default function Home() {
       </section>
 
       <SectionDivider variant="reverse" />
+
+      <section id="gift" className="py-16 md:py-24 bg-gradient-to-r from-pink-50 to-red-50">
+        <GiftSection />
+      </section>
+
+      <SectionDivider />
 
       <section
         id="access"

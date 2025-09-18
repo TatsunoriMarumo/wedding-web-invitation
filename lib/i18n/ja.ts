@@ -6,6 +6,7 @@ export const ja = {
     rsvp: "出欠登録",
     access: "アクセス",
     gallery: "ギャラリー",
+    gift: "ご祝儀",
   },
   hero: {
     title: "結婚式のご招待",
@@ -133,6 +134,26 @@ export const ja = {
         "出欠登録には有効な招待状のリンクが必要です メールでお送りした招待状のリンクからアクセスしてください",
       contact: "お問い合わせ",
     },
+  },
+  gift: {
+    title: "ご祝儀について",
+    subtitle1: "ご祝儀は事前振り込みにてお願い申し上げます",
+    subtitle2: "当日の現金でのお持ち込みは不要でございます",
+    transfer: {
+      title: "振込先",
+      accounts: {
+        bankName: "SBI新生銀行",
+        branchName: "さくら支店",
+        branchCode: "(300)",
+        accountType: "普通",
+        accountNumber: "3644081",
+        accountHolder: "藤岡拓人",
+      },
+    },
+    deadline: {
+      note1: "※お振込みは11月30日までに",
+      note2: "お願いいたします",
+    }
   },
   access: {
     title: "アクセス",
