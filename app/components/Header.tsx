@@ -30,28 +30,25 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      const sectionElements = sections.map((section) => ({
-        id: section.id,
-        element: document.getElementById(section.id),
-      }));
+  const handleScroll = () => {
+    const scrollOffset = headerHeight;
+    const sectionElements = sections.map(s => ({
+      id: s.id,
+      el: document.getElementById(s.id),
+    }));
 
-      // ヘッダーの高さを考慮してアクティブセクションを判定
-      const scrollOffset = headerHeight + 40;
-      const currentSection = sectionElements.find(({ element }) => {
-        if (!element) return false;
-        const rect = element.getBoundingClientRect();
-        return rect.top <= scrollOffset && rect.bottom >= scrollOffset;
-      });
+    const current = sectionElements.find(({ el }) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return r.top <= scrollOffset && r.bottom >= scrollOffset;
+    });
 
-      if (currentSection) {
-        setActiveSection(currentSection.id);
-      }
-    };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [headerHeight]);
+    if (current) setActiveSection(current.id as SectionId);
+  };
+  handleScroll();
+  window.addEventListener("scroll", handleScroll, { passive: true });
+  return () => window.removeEventListener("scroll", handleScroll);
+}, [headerHeight]);
 
   // スクロールロジック
   const scrollToSection = (sectionId: SectionId) => {
