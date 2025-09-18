@@ -1,3 +1,5 @@
+"use client";
+
 import { Suspense } from "react";
 import ClientWrapper from "./components/ClientWrapper";
 import Hero from "./components/Hero";
@@ -10,8 +12,10 @@ import Footer from "./components/Footer";
 import SectionDivider from "./components/SectionDivider";
 import Greeting from "./components/Greeting";
 import GiftSection from "./components/GifrSection";
+import { useLanguage } from "./providers";
 
 export default function Home() {
+  const { t } = useLanguage();
   return (
     <ClientWrapper>
       <section id="intro">
@@ -40,7 +44,7 @@ export default function Home() {
       <SectionDivider />
 
       <section id="rsvp" className="py-16 md:py-24">
-        <Suspense fallback={<div className="text-center">読み込み中...</div>}>
+        <Suspense fallback={<div className="text-center">{(t("common.loading"))}</div>}>
           <RsvpSection />
         </Suspense>
       </section>
