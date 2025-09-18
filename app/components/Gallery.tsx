@@ -191,7 +191,7 @@ export default function Gallery() {
                             </div>
                           </div>
                         </div>
-                        <p className="text-center text-sm text-gray-600 mt-2 px-2 font-klee">
+                        <p className="text-center text-sm text-gray-600 mt-2 px-2 font-klee whitespace-pre-line">
                           {image.alt}
                         </p>
                       </ImageModal>
