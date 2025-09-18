@@ -28,7 +28,7 @@ export default function Footer() {
               className="w-8 h-8 rounded-full object-cover ring-1 shadow"
             />
           </div>
-          <p className="text-red-500 max-w-2xl mx-auto leading-relaxed whitespace-pre-line">
+          <p className="max-w-2xl mx-auto leading-relaxed whitespace-pre-line">
             {t("footer.message")}
           </p>
         </div>
