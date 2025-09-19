@@ -11,7 +11,7 @@ export function AdminPageSkeleton() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="rounded-lg border bg-card text-card-foreground shadow-sm h-28 bg-gray-200"></div>
+          <div key={i} className="rounded-lg border text-card-foreground shadow-sm h-28 bg-gray-200"></div>
         ))}
       </div>
 
