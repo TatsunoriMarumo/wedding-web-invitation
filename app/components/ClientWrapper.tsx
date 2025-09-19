@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from "react";
 import Header from "./Header";
+import { useLanguage } from "../providers";
 
 interface ClientWrapperProps {
   children: ReactNode;
@@ -11,6 +12,7 @@ export default function ClientWrapper({ children }: ClientWrapperProps) {
   const [headerHeight, setHeaderHeight] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
+  const { t } = useLanguage();
 
   useEffect(() => {
     const updateHeaderHeight = () => {
@@ -59,7 +61,7 @@ export default function ClientWrapper({ children }: ClientWrapperProps) {
               {/* ローディングテキスト */}
               <div className="mt-4 space-y-2">
                 <div className="text-lg font-medium text-gray-700">
-                  Loading...
+                  {t("common.loading")}
                 </div>
                 <div className="flex items-center justify-center space-x-1">
                   <div

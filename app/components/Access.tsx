@@ -27,11 +27,15 @@ export default function Access() {
         {/* 地図 */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="h-80 bg-gray-200 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <MapPinIcon className="w-12 h-12 mx-auto mb-2" />
-              <p>Google Map</p>
-              <p className="text-sm">（実装時にGoogle Maps APIを使用）</p>
-            </div>
+            <iframe
+                title="venue-map"
+                src={`https://www.google.com/maps?q=%E3%80%92531-6101%20%E5%A4%A7%E9%98%AA%E5%B8%82%E5%8C%97%E5%8C%BA%E5%A4%A7%E6%B7%80%E4%B8%AD1-8-30&output=embed`}
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
           </div>
 
           <div className="p-6">
@@ -41,11 +45,11 @@ export default function Access() {
             <p className="text-gray-600 mb-4">{t("access.venue.address")}</p>
 
             <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center space-x-2 text-red-700">
+              <div className="flex items-center space-x-2 text-red-700 justify-center">
                 <TruckIcon className="w-5 h-5" />
                 <span className="font-medium">{t("access.parking.title")}</span>
               </div>
-              <p className="text-red-600 text-sm mt-1">
+              <p className="text-center text-red-600 text-sm mt-1 whitespace-pre-line">
                 {t("access.parking.notice")}
               </p>
             </div>
@@ -103,11 +107,11 @@ export default function Access() {
                   </div>
                 </div>
 
-                <p className="text-gray-700 mb-4">
+                <p className="text-gray-700 mb-4 whitespace-pre-line">
                   {t("access.walkAccess.description")}
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-2 whitespace-pre-line">
                   {t("access.walkAccess.details").map(
                     (detail: string, index: number) => (
                       <div key={index} className="flex items-start space-x-3">
@@ -144,11 +148,11 @@ export default function Access() {
                   </div>
                 </div>
 
-                <p className="text-gray-700 mb-4">
+                <p className="text-gray-700 mb-4 whitespace-pre-line">
                   {t("access.taxiAccess.description")}
                 </p>
 
-                <div className="space-y-2">
+                <div className="space-y-2 whitespace-pre-line">
                   {t("access.taxiAccess.details").map(
                     (detail: string, index: number) => (
                       <div key={index} className="flex items-start space-x-3">

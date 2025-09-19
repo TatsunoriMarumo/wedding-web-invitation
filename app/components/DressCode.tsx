@@ -23,7 +23,7 @@ export default function DressCode() {
         <h2 className="text-3xl md:text-4xl font-semibold text-gray-800 mb-4">
           {t("dresscode.title")}
         </h2>
-        <p className="text-lg text-gray-600 mb-6">{t("dresscode.subtitle")}</p>
+        <p className="text-lg text-gray-600 mb-6 whitespace-pre-wrap">{t("dresscode.subtitle")}</p>
         <div className="w-24 h-1 bg-gradient-to-r from-pink-400 to-orange-400 mx-auto rounded-full" />
       </div>
 
@@ -56,12 +56,12 @@ export default function DressCode() {
                 </div>
               </div>
 
-              <div className="flex-1">
+              <div className="w-full md:flex-1 md:min-w-0">
                 <div className="bg-green-50 p-6 rounded-xl">
                   <h4 className="font-semibold text-gray-800 text-lg mb-4">
                     {t("dresscode.point.ok")}
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-3 whitespace-pre-line">
                     {okMemos.map((memo, index) => (
                       <div key={index} className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
@@ -103,12 +103,12 @@ export default function DressCode() {
                 </div>
               </div>
 
-              <div className="flex-1">
+              <div className="w-full md:flex-1 md:min-w-0">
                 <div className="bg-red-50 p-6 rounded-xl">
                   <h4 className="font-semibold text-gray-800 text-lg mb-4">
                     {t("dresscode.point.ng")}
                   </h4>
-                  <div className="space-y-3">
+                  <div className="space-y-3 whitespace-pre-line">
                     {ngMemos.map((memo, index) => (
                       <div key={index} className="flex items-start space-x-3">
                         <div className="flex-shrink-0 w-2 h-2 bg-red-500 rounded-full mt-2"></div>

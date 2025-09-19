@@ -8,7 +8,7 @@ export default function Greeting() {
 
     return (
     <div className="container mx-auto px-4">
-        <p className="max-w-3xl mx-auto text-center text-gray-700 text-base md:text-lg leading-relaxed">
+        <p className="max-w-3xl mx-auto text-center text-gray-700 text-base md:text-lg leading-relaxed whitespace-pre-wrap">
             {t("hero.greeting") as string}
         </p>
     </div>

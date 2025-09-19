@@ -27,7 +27,7 @@ export default function Gallery() {
     "honeymoon/graduation.png",
     "honeymoon/gum_wall.png",
     "honeymoon/hamburger.png",
-    "honeymoon/look2.png",
+    "honeymoon/look.png",
     "honeymoon/public_market.png",
     "honeymoon/rachel.png",
     "honeymoon/starbucks.png",
@@ -39,9 +39,7 @@ export default function Gallery() {
     "date/christmas.jpg",
     "date/first-date.jpg",
     "date/first-two-shot.jpg",
-    "date/food.jpg",
     "date/fuji-q.jpg",
-    "date/gandam.jpg",
     "date/hatsumode.jpg",
     "date/river.jpg",
     "date/sakura.jpg",
@@ -193,7 +191,7 @@ export default function Gallery() {
                             </div>
                           </div>
                         </div>
-                        <p className="text-center text-sm text-gray-600 mt-2 px-2 font-klee">
+                        <p className="text-center text-sm text-gray-600 mt-2 px-2 font-klee whitespace-pre-line">
                           {image.alt}
                         </p>
                       </ImageModal>

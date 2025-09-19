@@ -20,6 +20,9 @@ export const metadata: Metadata = {
     description: ja.meta.description,
     images: ["/og-image.jpg"],
   },
+  icons: {
+    icon: "images/punta/punta-favi.ico"
+  }
 };
 
 export default function RootLayout({

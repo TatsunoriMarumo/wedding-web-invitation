@@ -13,12 +13,11 @@ export default function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="text-center py-16">
+    <div className="text-center py-16 whitespace-pre-line">
       <div className="max-w-md mx-auto">
         <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
           <span className="text-4xl text-gray-400">📧</span>
         </div>
-
         <h3 className="text-xl font-semibold text-gray-800 mb-4">{title}</h3>
 
         <p className="text-gray-600 mb-8 leading-relaxed">{description}</p>

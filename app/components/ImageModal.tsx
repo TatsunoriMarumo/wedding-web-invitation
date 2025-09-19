@@ -214,7 +214,7 @@ export default function ImageModal({
             )}
 
             <div className="absolute bottom-16 left-1/2 -translate-x-1/2 text-center">
-              <p className="text-white text-sm bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1 inline-block">
+              <p className="text-white text-sm bg-black/60 backdrop-blur-sm rounded-lg px-3 py-1 inline-block whitespace-pre-line">
                 {currentImageTitle}
               </p>
             </div>
