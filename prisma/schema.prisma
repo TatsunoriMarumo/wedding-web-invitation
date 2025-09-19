@@ -70,7 +70,7 @@ model InvitationToken {
   usedAt           DateTime?
 
   // 1:N の back-relation（このトークンで回答したゲスト）
-  guest            Guest[]
+  guests            Guest[]
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
