@@ -100,17 +100,22 @@ export const ja = {
       lastname: "姓",
       email: "メールアドレス",
       phone: "電話番号",
+      // ★ 追加
+      birthdate: "生年月日",
+
       attendance: "出欠",
       attend: "出席",
       decline: "欠席",
       submit: "送信する",
       submitting: "送信中...",
+
       steps: {
         basic: "基本情報",
         attendance: "同伴者情報",
         health: "アレルギー情報",
         confirm: "確認",
       },
+
       companions: {
         label: "同伴者",
         add: "同伴者を追加",
@@ -118,47 +123,50 @@ export const ja = {
         lastnamePlaceholder: "姓",
         emailPlaceholder: "メールアドレス（任意）",
         phonePlaceholder: "電話番号（任意）",
-        noCompanions: "同伴者がいない場合は「次へ」をクリックしてください",
+        // ★ 追加
+        birthdatePlaceholder: "生年月日",
+        remove: "削除",
+        noCompanions: "同伴者は未追加です",
         companionNumber: "同伴者",
       },
+
       health: {
         dogAllergy: "犬アレルギーはありますか？",
         foodAllergy: "食物アレルギー",
-        foodAllergyPlaceholder: "その他のアレルギー",
-        yes: "はい",
-        no: "いいえ",
+        foodAllergyPlaceholder: "その他（入力して Enter）",
+        commonAllergens: "よくあるアレルギー",
         add: "追加",
         close: "閉じる",
-        commonAllergens: "一般的なアレルゲン：",
-        allergyInfo: "アレルギー情報",
-        personAllergy: "様のアレルギー情報",
+        yes: "あり",
+        no: "なし",
       },
+
+      confirmation: {
+        mainGuest: "代表者",
+        companionGuest: "同伴者",
+        name: "お名前",
+        email: "メール：",
+        phone: "電話：",
+        attendance: "出欠：",
+        allergy: "アレルギー：",
+        // ★ 追加
+        birthdate: "生年月日",
+      },
+
       navigation: {
         back: "戻る",
         next: "次へ",
       },
-      confirmation: {
-        name: "お名前：",
-        email: "メール：",
-        phone: "電話：",
-        attendance: "出欠：",
-        companions: "同伴者：",
-        allergy: "アレルギー：",
-        mainGuest: "ご本人様",
-        companionGuest: "同伴者",
-      },
+
       validation: {
         selectAttendance: "出欠を選択してください",
         requiredFields: "必須項目を入力してください",
+        // ★ 追加（Zodエラーと整合）
+        birthdateRequired: "生年月日は必須です",
+        birthdateInvalidFormat: "日付の形式は YYYY-MM-DD で入力してください",
+        birthdateFuture: "生年月日が未来日です",
+        fillCompanions: "同伴者も氏名と生年月日が必須です。",
       },
-    },
-    error: {
-      title: "招待状が必要です",
-      description: `出欠登録には有効な招待状のリンクが必要です 
-      メールでお送りした招待状のリンクから
-      アクセスしてください
-      `,
-      contact: "お問い合わせ",
     },
   },
   gift: {

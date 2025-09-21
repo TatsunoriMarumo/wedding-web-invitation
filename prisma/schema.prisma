@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
+// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client-js"
@@ -13,45 +10,48 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================
-// Enums
-// ============================
-
-enum AttendanceStatus {
-  ATTEND   // 出席
-  DECLINE  // 欠席
-}
+/* ===========================
+ * Enums
+ * =========================== */
 
 enum AllergenCategory {
-  DOG      // 犬アレルギー
-  FOOD     // 食物アレルギー（卵/乳/小麦/…＋任意追加）
+  DOG
+  FOOD
 }
 
-// ============================
-// Models
-// ============================
+enum AttendanceStatus {
+  ATTEND
+  DECLINE
+}
+
+/* ===========================
+ * Models
+ * =========================== */
 
 /**
- * 参加者（代表/同伴の概念なし。全員が独立レコード）
- * 出欠は参加者単位で保持。
+ * 参加者（代表者＋同伴者）
  */
 model Guest {
-  id             Int               @id @default(autoincrement())
-  firstName      String
-  lastName       String
-  email          String?
-  phone          String?
-  attendance     AttendanceStatus
+  id                Int               @id @default(autoincrement())
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
 
-  // どの招待トークンから回答したか（任意）。
-  // 1トークン=1回答の制約を守るため unique。
-  invitationTokenId Int?  
+  // ★ 必須：生年月日（時刻不要なので @db.Date 推奨）
+  birthDate         DateTime          @db.Date
+
+  attendance        AttendanceStatus
+
+  // どの招待トークンから回答したか（任意）
+  invitationTokenId Int?
   invitationToken   InvitationToken?  @relation(fields: [invitationTokenId], references: [id], onDelete: SetNull)
 
-  allergies      GuestAllergy[]    // 多対多（中間テーブル）
+  // アレルギー（多対多）
+  allergies         GuestAllergy[]
 
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@index([lastName, firstName])
   @@index([attendance])
@@ -59,54 +59,49 @@ model Guest {
 }
 
 /**
- * 招待トークン（最小要件：宛名＋使用済みフラグ）
- * トークン使用時に isUsed を true、usedAt をセット。
+ * 招待トークン
+ * 1トークン=1回答の想定。回答完了で isUsed=true, usedAt=NOW。
  */
 model InvitationToken {
-  id               Int       @id @default(autoincrement())
-  token            String    @unique
-  inviteeName      String
-  isUsed           Boolean   @default(false)
-  usedAt           DateTime?
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  inviteeName   String   // 招待者表示名など
+  isUsed    Boolean  @default(false)
+  usedAt    DateTime?
 
-  // 1:N の back-relation（このトークンで回答したゲスト）
-  guests            Guest[]
+  guests    Guest[]
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-
-  @@index([isUsed])
-  @@index([inviteeName])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 /**
- * アレルゲンのマスタ（「犬」は {category:DOG, name:"犬"} で1件）
- * 食物は {category:FOOD, name:"卵"} のように増やす
+ * アレルゲンのマスタ（カテゴリ＋名称で一意）
  */
 model Allergen {
-  id         Int              @id @default(autoincrement())
-  category   AllergenCategory
-  name       String
-  guests     GuestAllergy[]
+  id        Int               @id @default(autoincrement())
+  category  AllergenCategory
+  name      String
 
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  guests    GuestAllergy[]
 
-  @@unique([category, name], name: "category_name")  // 同カテゴリ内で名称一意
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@unique([category, name], name: "category_name_unique")
   @@index([category])
 }
 
 /**
- * 参加者 × アレルゲン（多対多の中間表）
- * 1人が同じアレルゲンを重複登録できないよう複合主キー。
+ * 中間テーブル：Guest × Allergen
  */
 model GuestAllergy {
-  guestId     Int
-  allergenId  Int
-  notedAt     DateTime @default(now())
+  guestId    Int
+  allergenId Int
+  notedAt    DateTime @default(now())
 
-  guest       Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  allergen    Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
+  guest      Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  allergen   Allergen @relation(fields: [allergenId], references: [id], onDelete: Restrict)
 
   @@id([guestId, allergenId])
   @@index([allergenId])

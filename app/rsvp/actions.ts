@@ -7,22 +7,54 @@ import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { AllergenCategory, AttendanceStatus } from "@prisma/client";
 
-// 再送信（上書き）を許可：開発時は true、本番で一度きりなら false
+/* ===========================
+ * 設定
+ * =========================== */
+
+// 再送信（上書き）を許可：開発中は true、本番で一度きりにしたい時は false
 const ALLOW_RESUBMIT = true;
 
 /* ===========================
  * Zod Schemas
  * =========================== */
+
 const allergyItemSchema = z.object({
+  id: z.string(), // クライアント側一意ID（DBには保存しない）
   type: z.enum(["dog", "food"]),
   allergen: z.string().trim().min(1, "アレルギー名は必須です"),
 });
 
+// YYYY-MM-DD または YYYY/MM/DD を Date(UTC 00:00) に変換
+const parseYMD = (s: string) => {
+  const m = /^(\d{4})[-/](\d{2})[-/](\d{2})$/.exec(s);
+  if (!m) throw new Error("日付の形式は YYYY/MM/DD で入力してください");
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  // 妥当性チェック（存在する日付か）
+  const dt = new Date(Date.UTC(y, mo - 1, d));
+  const valid =
+    dt.getUTCFullYear() === y &&
+    dt.getUTCMonth() + 1 === mo &&
+    dt.getUTCDate() === d;
+  if (!valid) throw new Error("日付が正しくありません");
+  return dt;
+};
+
+const todayUTC = new Date(new Date().toISOString().slice(0, 10));
+
 const personSchema = z.object({
-  firstName: z.string().trim().min(1, "姓は必須です"),
-  lastName: z.string().trim().min(1, "名は必須です"),
-  email: z.string().email("無効なメールアドレスです").optional().or(z.literal("")),
-  phone: z.string().trim().optional().or(z.literal("")),
+  firstName: z.string().trim().min(1, "名は必須です"),
+  lastName:  z.string().trim().min(1, "姓は必須です"),
+  email:     z.string().email("無効なメールアドレスです").optional().or(z.literal("")),
+  phone:     z.string().trim().optional().or(z.literal("")),
+
+  // ★ 必須：生年月日（YYYY-MM-DD）
+  birthDate: z
+    .string()
+    .min(1, "生年月日は必須です")
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "日付の形式は YYYY-MM-DD で入力してください")
+    .transform(parseYMD)
+    .refine((d) => d.getTime() <= todayUTC.getTime(), "生年月日が未来日です"),
+
   allergies: z.array(allergyItemSchema),
 });
 
@@ -30,28 +62,33 @@ const payloadSchema = z
   .object({
     token: z.string().min(1, "招待トークンは必須です"),
     attendance: z.enum(["attend", "decline"]),
+    // guests[0] が代表者。decline の場合は代表者のみを保存。
     guests: z.array(personSchema).min(1, "最低1名のゲスト情報が必要です"),
   })
   .refine(
     (data) => {
-      const mainGuest = data.guests[0];
-      return !!(mainGuest?.email && mainGuest.phone && mainGuest.phone.length > 0);
+      const m = data.guests[0];
+      return !!(m?.email && m.phone && m.phone.length > 0);
     },
-    { message: "代表者には有効なメールアドレスと電話番号が必須です", path: ["guests", "0"] }
+    { message: "代表者には有効なメールアドレスと電話番号が必須です", path: ["guests", "0"] },
   );
 
 /* ===========================
  * Helpers
  * =========================== */
+
 const norm = (s?: string | null) => (s && s.trim() ? s.trim() : null);
+
 const toAttendance = (v: "attend" | "decline"): AttendanceStatus =>
   v === "attend" ? AttendanceStatus.ATTEND : AttendanceStatus.DECLINE;
-const toCategory = (t: "dog" | "food"): AllergenCategory =>
-  t === "dog" ? AllergenCategory.DOG : AllergenCategory.FOOD;
+
+const toCategory = (v: "dog" | "food"): AllergenCategory =>
+  v === "dog" ? AllergenCategory.DOG : AllergenCategory.FOOD;
 
 /* ===========================
  * Action
  * =========================== */
+
 export async function submitRsvp(formData: FormData) {
   try {
     // 1) 取り出し & Zod検証
@@ -66,99 +103,93 @@ export async function submitRsvp(formData: FormData) {
       // 2.1) トークン検証
       const invitationToken = await tx.invitationToken.findUnique({ where: { token } });
       if (!invitationToken) throw new Error("無効な招待トークンです。URLを確認してください。");
-      if (!ALLOW_RESUBMIT && invitationToken.isUsed) throw new Error("この招待は既に使用されています。");
+      if (!ALLOW_RESUBMIT && invitationToken.isUsed)
+        throw new Error("この招待は既に使用されています。");
 
-      // decline のときは代表者のみ登録
-      const guestsToProcess = attendance === "decline" ? [guestData[0]] : guestData;
+      const guestsToProcess =
+        attendanceStatus === AttendanceStatus.DECLINE ? [guestData[0]] : guestData;
 
-      // 2.2) 再送信可なら既存ゲストを削除（上書き）
+      // 2.2) 再送信許可時は既存ゲストを削除して上書き
       if (ALLOW_RESUBMIT && invitationToken.isUsed) {
         await tx.guest.deleteMany({ where: { invitationTokenId: invitationToken.id } });
       }
 
-      // 2.3) 出席者のみアレルゲンを事前 upsert（カテゴリ＋名前で一意）
-      const allergenIdByKey = new Map<string, number>(); // key = `${category}:${name}`
+      // 2.3) 出席者のみ：アレルゲンを（カテゴリ＋名称）で upsert してIDをキャッシュ
+      const allergenIdByKey = new Map<string, number>(); // `${category}:${name}`
       if (attendanceStatus === AttendanceStatus.ATTEND) {
-        const unique = new Map<string, { category: AllergenCategory; name: string }>();
+        const pairs = new Set<string>();
         for (const g of guestsToProcess) {
           for (const a of g.allergies) {
-            const category = toCategory(a.type);
+            const cat = toCategory(a.type);
             const name = a.allergen.trim();
             if (!name) continue;
-            const key = `${category}:${name}`;
-            if (!unique.has(key)) unique.set(key, { category, name });
+            pairs.add(`${cat}:${name}`);
           }
         }
-
-        for (const { category, name } of unique.values()) {
-          const rec = await tx.allergen.upsert({
-            // ※ Allergen に @@unique([category, name], name: "category_name") が必要
-            where: { category_name: { category, name } },
+        for (const key of pairs) {
+          const [catStr, name] = key.split(":");
+          const cat = catStr as keyof typeof AllergenCategory;
+          const upserted = await tx.allergen.upsert({
+            where: {
+              category_name_unique: {
+                category: AllergenCategory[cat],
+                name,
+              },
+            },
             update: {},
-            create: { category, name },
+            create: { category: AllergenCategory[cat], name },
             select: { id: true },
           });
-          allergenIdByKey.set(`${category}:${name}`, rec.id);
+          allergenIdByKey.set(key, upserted.id);
         }
       }
 
-      // 2.4) ゲスト作成 & アレルギー紐付け（重複耐性あり）
-      for (const guest of guestsToProcess) {
+      // 2.4) ゲスト登録（代表者→同伴者の順）
+      for (const g of guestsToProcess) {
         const created = await tx.guest.create({
           data: {
-            firstName: guest.firstName,
-            lastName: guest.lastName,
-            email: norm(guest.email),
-            phone: norm(guest.phone),
-            attendance: attendanceStatus,
+            firstName: g.firstName,
+            lastName:  g.lastName,
+            email:     norm(g.email),
+            phone:     norm(g.phone),
+
+            // ★ 必須
+            birthDate: g.birthDate,
+
+            attendance:        attendanceStatus,
             invitationTokenId: invitationToken.id,
           },
           select: { id: true },
         });
 
-        if (attendanceStatus === AttendanceStatus.ATTEND && guest.allergies.length) {
-          // ゲスト内の重複を除去 → createMany + skipDuplicates
-          const pairs = new Set<string>(); // `${guestId}:${allergenId}`
-          for (const a of guest.allergies) {
-            const category = toCategory(a.type);
+        // 出席者のみアレルギー付与
+        if (attendanceStatus === AttendanceStatus.ATTEND && g.allergies.length) {
+          const linkPairs = new Set<string>(); // `${guestId}:${allergenId}`
+          for (const a of g.allergies) {
+            const cat = toCategory(a.type);
             const name = a.allergen.trim();
             if (!name) continue;
-            const key = `${category}:${name}`;
+            const key = `${cat}:${name}`;
             const allergenId = allergenIdByKey.get(key);
-            if (allergenId) pairs.add(`${created.id}:${allergenId}`);
+            if (allergenId) linkPairs.add(`${created.id}:${allergenId}`);
           }
-
-          if (pairs.size) {
+          if (linkPairs.size) {
             await tx.guestAllergy.createMany({
-              data: Array.from(pairs).map((k) => {
+              data: Array.from(linkPairs).map((k) => {
                 const [guestIdStr, allergenIdStr] = k.split(":");
                 return { guestId: Number(guestIdStr), allergenId: Number(allergenIdStr) };
               }),
-              // GuestAllergy に @@id([guestId, allergenId]) or @@unique([guestId, allergenId]) があるとさらに安全
               skipDuplicates: true,
             });
           }
         }
       }
 
-      // 2.5) トークンを使用済みに更新（競合耐性）
-      const upd = await tx.invitationToken.updateMany({
-        where: { id: invitationToken.id, isUsed: false },
+      // 2.5) トークンを使用済みに（再送信可でも毎回更新）
+      await tx.invitationToken.update({
+        where: { id: invitationToken.id },
         data: { isUsed: true, usedAt: new Date() },
       });
-
-      // 再送信不可モードでは競合検知
-      if (!ALLOW_RESUBMIT && upd.count === 0) {
-        throw new Error("この招待は直前に他の処理で使用されました。ページを更新して再度お試しください。");
-      }
-
-      // 再送信可で既に使用済みなら usedAt のみ更新
-      if (ALLOW_RESUBMIT && invitationToken.isUsed) {
-        await tx.invitationToken.update({
-          where: { id: invitationToken.id },
-          data: { usedAt: new Date() },
-        });
-      }
     });
 
     // 3) 成功：キャッシュ無効化 & リダイレクト
