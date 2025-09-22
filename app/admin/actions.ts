@@ -37,6 +37,7 @@ export async function getAdminData() {
       id: g.id,
       firstName: g.firstName,
       lastName: g.lastName,
+      birthDate: g.birthDate,
       email: g.email ?? null,
       phone: g.phone ?? null,
       attendance: g.attendance as "ATTEND" | "DECLINE",

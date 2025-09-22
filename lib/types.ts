@@ -12,6 +12,7 @@ export interface Guest {
   id: number;
   firstName: string;
   lastName: string;
+  birthDate: string | Date;
   email?: string | null;
   phone?: string | null;
   attendance: "ATTEND" | "DECLINE";

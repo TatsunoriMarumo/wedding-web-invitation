@@ -15,6 +15,20 @@ interface AdminDashboardProps {
   initialGuests: Guest[];
 }
 
+const formatBirthdate = (bd: unknown) => {
+  if (!bd) return "";
+  if (typeof bd === "string") {
+    const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
+  }
+  if (bd instanceof Date) return bd.toLocaleDateString("ja-JP");
+  try {
+    return new Date(bd as any).toLocaleDateString("ja-JP");
+  } catch {
+    return "";
+  }
+};
+
 export function AdminDashboard({
   initialTokens,
   initialGuests,
@@ -40,21 +54,18 @@ export function AdminDashboard({
   );
 
   const handleSuccess = (newToken: InviteToken) => {
-    // Server Actionが成功したら、実際のデータでStateを更新
     setTokens((prev) => [newToken, ...prev]);
   };
 
   const handleTokenDeleted = (tokenId: number) => {
-    // 楽観的更新を適用
     addOptimisticToken({ type: "delete", tokenId });
-    // 実際のStateも更新
     setTokens((prev) => prev.filter(t => t.id !== tokenId));
   };
 
   const exportToExcel = () => {
-    // (CSVエクスポート機能は変更なし)
+    // ★ CSVに生年月日列を追加
     const csvContent = [
-      ["姓", "名", "メールアドレス", "電話番号", "出欠", "アレルギー", "登録日時"],
+      ["姓", "名", "メールアドレス", "電話番号", "出欠", "アレルギー", "生年月日", "登録日時"],
       ...guests.map((guest) => [
         guest.lastName,
         guest.firstName,
@@ -62,6 +73,7 @@ export function AdminDashboard({
         guest.phone || "",
         guest.attendance === "ATTEND" ? "出席" : "欠席",
         guest.allergies.map((a) => a.allergen.name).join(", "),
+        formatBirthdate((guest as any).birthDate),
         new Date(guest.createdAt).toLocaleString("ja-JP"),
       ]),
     ]

@@ -346,6 +346,7 @@ export const ja = {
         contact: "連絡先",
         attendance: "出欠",
         allergies: "アレルギー",
+        birthdate: "生年月日",
         registeredAt: "登録日時",
         attend: "出席",
         decline: "欠席",
