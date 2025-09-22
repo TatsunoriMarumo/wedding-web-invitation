@@ -1,21 +1,28 @@
-"use client";
-
-import { Suspense } from "react";
+import { Suspense, use } from "react";
 import ClientWrapper from "./components/ClientWrapper";
 import Hero from "./components/Hero";
 import CoupleProfile from "./components/CoupleProfile";
 import DressCode from "./components/DressCode";
-import RsvpSection from "./components/RsvpSection";
+import RsvpGate from "./components/RsvpGate";
 import Access from "./components/Access";
 import Gallery from "./components/Gallery";
 import Footer from "./components/Footer";
 import SectionDivider from "./components/SectionDivider";
 import Greeting from "./components/Greeting";
 import GiftSection from "./components/GifrSection";
-import { useLanguage } from "./providers";
+import LoadingText from "./components/LosdingText";
 
-export default function Home() {
-  const { t } = useLanguage();
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default function Home({
+  searchParams,
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const sp = use(searchParams);
+  const tokenParam = sp?.token;
+  const token = Array.isArray(tokenParam) ? tokenParam[0] : tokenParam;
+
   return (
     <ClientWrapper>
       <section id="intro">
@@ -44,8 +51,8 @@ export default function Home() {
       <SectionDivider />
 
       <section id="rsvp" className="py-16 md:py-24">
-        <Suspense fallback={<div className="text-center">{(t("common.loading"))}</div>}>
-          <RsvpSection />
+        <Suspense fallback={<LoadingText />}>
+          <RsvpGate token={token ?? null} />
         </Suspense>
       </section>
 

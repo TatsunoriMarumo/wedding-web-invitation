@@ -93,8 +93,26 @@ export const ja = {
     },
   },
   rsvp: {
-    title: "出欠のご連絡",
-    subtitle: "ご出席の可否をお聞かせください",
+    title: "ご出欠のご返信",
+    subtitle: {
+      default: "フォームに必要事項をご入力ください",
+      named: "{{name}} 様のご出欠について、フォームに必要事項をご入力ください",
+    },
+    used: {
+      badge: "このリンクは使用済みです",
+      title: {
+        default: "この招待リンクはすでに使用されています",
+        named: "{{name}} 様、この招待リンクはすでに使用されています",
+      },
+      description: "お手数ですが、主催者までご連絡ください。確認の上、ご案内いたします。",
+      contact: "主催者に連絡する",
+    },
+    error: {
+      title: "無効な招待リンクです",
+      description: "リンクが間違っているか、有効期限切れの可能性があります。",
+      missingTitle: "招待リンクが見つかりません",
+      contact: "主催者に連絡する",
+    },
     form: {
       firstname: "名",
       lastname: "姓",
@@ -358,5 +376,20 @@ export const ja = {
       cancel: "キャンセル",
       complete: "完了",
     },
+  },
+    thankYou: {
+    title: "ご回答ありがとうございます",
+    imageAlt: "RSVP 完了イメージ",
+    badge: "RSVP 完了",
+    titleNamed: "{{name}} 様、ありがとうございます",
+    titleDefault: "ありがとうございます",
+    descriptionAttend:
+      "ご出席のご連絡をいただき、心より感謝申し上げます。当日お会いできるのを楽しみにしています。",
+    descriptionDecline:
+      "ご欠席のご連絡をいただき、感謝申し上げます。あたたかいお気持ち、確かに受け取りました。",
+    descriptionGeneric: "ご回答に感謝いたします。内容を受け付けました。",
+    changeNote:
+      "内容の変更をご希望の際は、お手数ですが上の「問い合わせる」よりご連絡ください。",
+    actions: { contact: "問い合わせる" },
   },
 } as const;

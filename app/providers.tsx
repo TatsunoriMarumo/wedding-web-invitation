@@ -38,24 +38,33 @@ type PathValue<T, P extends string> = P extends `${infer K}.${infer R}`
 
 type ValueOfKey<K extends TranslationKey> = PathValue<TranslationSchema, K>;
 
+/** ===== 追加：t用オプション型（差し込みを許可） ===== */
+type TOptions = {
+  returnObjects?: boolean;
+} & Record<string, string | number | boolean | null | undefined>;
+
 /** ===== Context 型 ===== */
 interface LanguageContextType {
-  t: <K extends TranslationKey>(
-    key: K,
-    _opts?: { returnObjects?: boolean }
-  ) => ValueOfKey<K>;
+  t: <K extends TranslationKey>(key: K, opts?: TOptions) => ValueOfKey<K>;
   language: Language;
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(
-  undefined
-);
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function useLanguage() {
   const ctx = useContext(LanguageContext);
-  if (!ctx)
-    throw new Error("useLanguage must be used within a LanguageProvider");
+  if (!ctx) throw new Error("useLanguage must be used within a LanguageProvider");
   return ctx;
+}
+
+/** ===== 追加：{{var}} 補間関数 ===== */
+function interpolate(template: string, opts?: TOptions): string {
+  if (!opts) return template;
+  const { returnObjects: _ignored, ...vars } = opts;
+  return template.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k: string) => {
+    const v = vars[k];
+    return v === null || v === undefined ? "" : String(v);
+  });
 }
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -64,27 +73,24 @@ export function Providers({ children }: { children: ReactNode }) {
 
   // t はキー型に応じた厳密な返り値型を維持
   const t = useCallback(
-    <K extends TranslationKey>(
-      key: K,
-      _opts?: { returnObjects?: boolean }
-    ): ValueOfKey<K> => {
+    <K extends TranslationKey>(key: K, opts?: TOptions): ValueOfKey<K> => {
       const v = getNestedValue(translations[language], key as string);
       if (process.env.NODE_ENV !== "production" && v == null) {
-        // 開発時のみ warn（本番では無音）
         console.warn(`[i18n] Missing key: ${String(key)} (lang=${language})`);
       }
-      // 未定義ならキー文字列をそのまま返す（型は安全にキャスト）
-      return (v ?? key) as ValueOfKey<K>;
+
+      // 文字列は補間して返す
+      if (typeof v === "string") {
+        return interpolate(v, opts) as ValueOfKey<K>;
+      }
+
+      // オブジェクト/配列/その他はそのまま返す（キー型に合致）
+      return (v ?? (key as unknown)) as ValueOfKey<K>;
     },
     [language]
   );
 
-  // Provider 値はメモ化して下位ツリーの再レンダーを抑制
   const value = useMemo(() => ({ t, language }), [t, language]);
 
-  return (
-    <LanguageContext.Provider value={value}>
-      {children}
-    </LanguageContext.Provider>
-  );
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
