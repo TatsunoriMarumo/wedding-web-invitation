@@ -3,7 +3,6 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { AllergenCategory, AttendanceStatus } from "@prisma/client";
 
@@ -193,8 +192,7 @@ export async function submitRsvp(formData: FormData) {
     });
 
     // 3) 成功：キャッシュ無効化 & リダイレクト
-    revalidatePath("/admin/guests");
-    redirect("/thank-you");
+    revalidatePath("/admin");
   } catch (error) {
     console.error("RSVP Submission Failed:", error);
     const message =
