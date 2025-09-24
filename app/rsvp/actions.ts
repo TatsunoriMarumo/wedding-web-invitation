@@ -3,179 +3,164 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { AllergenCategory, AttendanceStatus } from "@prisma/client";
 
 /* ===========================
- * Zod Schemas
+ * Zod schemas (payload from <RsvpForm />)
  * =========================== */
-const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
-
 const allergyItemSchema = z.object({
   type: z.enum(["dog", "food"]),
-  allergen: z.string().trim().min(1, "アレルギー名は必須です"),
+  allergen: z.string().trim().min(1),
 });
 
 const personSchema = z.object({
-  firstName: z.string().trim().min(1, "姓は必須です"),
-  lastName: z.string().trim().min(1, "名は必須です"),
-  // `YYYY-MM-DD` を受け取り Date に正規化（DBは @db.Date）
+  lastName: z.string().trim().min(1),
+  firstName: z.string().trim().min(1),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v : null)),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((v) => (v ? v : null)),
   birthDate: z
-    .union([z.string(), z.date()])
-    .transform((v) => {
-      if (v instanceof Date) return new Date(Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate()));
-      if (!isoDateRegex.test(v)) throw new Error("生年月日は YYYY-MM-DD 形式で入力してください。");
-      const [y, m, d] = v.split("-").map(Number);
-      return new Date(Date.UTC(y, m - 1, d));
-    }),
-  email: z.string().email("無効なメールアドレスです").optional().or(z.literal("")),
-  phone: z.string().trim().optional().or(z.literal("")),
-  allergies: z.array(allergyItemSchema).default([]),
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD (UTCで保存)
+  allergies: z.array(allergyItemSchema),
 });
 
-const formSchema = z.object({
-  token: z.string().trim().min(1, "招待トークンがありません"),
-  attendanceStatus: z.enum(["ATTEND", "DECLINE"]),
-  guests: z.array(personSchema).min(1, "参加者は最低1名必要です"),
+const payloadSchema = z.object({
+  token: z.string().min(1),
+  attendance: z.enum(["attend", "decline"]),
+  guests: z.array(personSchema).min(1),
 });
 
 /* ===========================
  * Helpers
  * =========================== */
-function toNullable(val?: string | null) {
-  if (val === undefined || val === null) return null;
-  const s = String(val).trim();
-  return s.length === 0 ? null : s;
-}
+const toUTCDate = (isoYYYYMMDD: string) =>
+  new Date(isoYYYYMMDD + "T00:00:00.000Z");
 
-function toAttendanceStatusEnum(s: "ATTEND" | "DECLINE"): AttendanceStatus {
-  return s === "ATTEND" ? AttendanceStatus.ATTEND : AttendanceStatus.DECLINE;
-}
+async function findOrCreateAllergen(
+  category: AllergenCategory,
+  nameRaw: string
+) {
+  const name = nameRaw.trim();
+  const found = await prisma.allergen.findFirst({
+    where: { category, name },
+    select: { id: true },
+  });
+  if (found) return found.id;
 
-function toAllergenCategoryEnum(s: "dog" | "food"): AllergenCategory {
-  return s === "dog" ? AllergenCategory.DOG : AllergenCategory.FOOD;
+  const created = await prisma.allergen.create({
+    data: { category, name },
+    select: { id: true },
+  });
+  return created.id;
 }
 
 /* ===========================
- * Server Action（Resubmit禁止）
+ * Main Server Action
  * =========================== */
-/**
- * フォーム側では、以下のように JSON を FormData で送ってください:
- * const payload = { token, attendanceStatus, guests };
- * const fd = new FormData();
- * fd.set("payload", JSON.stringify(payload));
- */
-export async function submitRsvp(_prevState: unknown, formData: FormData) {
-  try {
-    const raw = formData.get("payload");
-    if (typeof raw !== "string") {
-      throw new Error("フォームデータが不正です。もう一度お試しください。");
-    }
+export async function submitRsvp(formData: FormData) {
+  // 1) Parse + validate payload
+  const raw = formData.get("payload");
+  if (typeof raw !== "string") {
+    throw new Error("Invalid form payload.");
+  }
+  const parsed = payloadSchema.safeParse(JSON.parse(raw));
+  if (!parsed.success) {
+    // フロントに詳細を返したい場合はここで整形して返す
+    throw new Error("Validation failed.");
+  }
+  const { token, attendance, guests } = parsed.data;
 
-    const parsed = formSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) {
-      const msg = parsed.error.issues.map((i) => i.message).join("\n");
-      throw new Error(msg || "入力内容に誤りがあります。");
-    }
+  // 2) Token checks (RESUBMIT不可)
+  const tok = await prisma.invitationToken.findUnique({
+    where: { token },
+    select: { id: true, isUsed: true }, // schema に usedAt がある場合は適宜 select 追加可
+  });
+  if (!tok) {
+    throw new Error("Invalid invitation token.");
+  }
+  if (tok.isUsed) {
+    throw new Error("This invitation link has already been used.");
+  }
 
-    const { token, attendanceStatus, guests } = parsed.data;
-    const attendanceStatusEnum = toAttendanceStatusEnum(attendanceStatus);
-
-    await prisma.$transaction(async (tx) => {
-      // 1) 同時二重送信対策: 招待トークンの行をロック
-      await tx.$queryRaw`SELECT id, "isUsed" FROM "InvitationToken" WHERE token = ${token} FOR UPDATE`;
-
-      // 2) トークン検証（Resubmitは無条件で禁止）
-      const invitationToken = await tx.invitationToken.findUnique({
-        where: { token },
-        select: { id: true, isUsed: true },
-      });
-      if (!invitationToken) {
-        throw new Error("無効な招待トークンです。URLを確認してください。");
-      }
-      if (invitationToken.isUsed) {
-        throw new Error("この招待は既に使用されています。");
-      }
-
-      // 3) 処理対象のゲスト（欠席は代表者のみ受付）
-      const guestsToProcess =
-        attendanceStatusEnum === AttendanceStatus.DECLINE ? [guests[0]] : guests;
-
-      // 4) 出席時のみ: アレルゲン ID 取得（複合一意が型に出ていない環境でも動くよう find→create に変更）
-      const allergenIdByKey = new Map<string, number>();
-      const getAllergenId = async (type: "dog" | "food", name: string) => {
-        const category = toAllergenCategoryEnum(type);
-        const key = `${category}:${name.toLowerCase()}`;
-        const cached = allergenIdByKey.get(key);
-        if (cached) return cached;
-
-        // 4.1) 既存検索
-        const found = await tx.allergen.findFirst({
-          where: { category, name },
-          select: { id: true },
-        });
-        if (found) {
-          allergenIdByKey.set(key, found.id);
-          return found.id;
-        }
-        // 4.2) 未登録なら作成
-        const created = await tx.allergen.create({
-          data: { category, name },
-          select: { id: true },
-        });
-        allergenIdByKey.set(key, created.id);
-        return created.id;
-      };
-
-      // 5) ゲスト作成（出欠別の分岐あり）
-      for (const g of guestsToProcess) {
-        const created = await tx.guest.create({
-          data: {
-            firstName: g.firstName,
-            lastName: g.lastName,
-            birthDate: g.birthDate, // 必須フィールド
-            email: toNullable(g.email),
-            phone: toNullable(g.phone),
-            attendance: attendanceStatusEnum,
-            invitationToken: { connect: { id: invitationToken.id } },
-          },
-          select: { id: true },
-        });
-
-        if (attendanceStatusEnum === AttendanceStatus.ATTEND && g.allergies.length > 0) {
-          const links = [];
-          for (const a of g.allergies) {
-            const allergenId = await getAllergenId(a.type, a.allergen.trim());
-            links.push(
-              tx.guestAllergy.create({
-                data: {
-                  guestId: created.id,
-                  allergenId,
-                },
-              }),
-            );
-          }
-          if (links.length) await Promise.all(links);
-        }
-      }
-
-      // 6) 最後にトークンを使用済みに更新（Resubmit禁止の肝）
-      await tx.invitationToken.update({
-        where: { id: invitationToken.id },
-        data: { isUsed: true, usedAt: new Date() },
-      });
+  // 3) Persist (single transaction)
+  await prisma.$transaction(async (tx) => {
+    // 3-1) Mark token used first (single-use guarantee)
+    await tx.invitationToken.update({
+      where: { id: tok.id },
+      data: { isUsed: true },
     });
 
-    // キャッシュの無効化（必要に応じてパスを調整）
-    revalidatePath("/admin");
-    revalidatePath("/");
+    // 3-2) Create guests
+    const isAttend = attendance === "attend";
 
-  } catch (err: unknown) {
-    console.error("[submitRsvp] error:", err);
-    const message =
-      err instanceof Error ? err.message : "送信に失敗しました。時間をおいて再試行してください。";
-    // ページ遷移ではなくフォームのエラー表示に使う場合は return で返す
-    return { error: message };
-  }
+    for (const p of guests) {
+      const g = await tx.guest.create({
+        data: {
+          lastName: p.lastName,
+          firstName: p.firstName,
+          email: p.email,
+          phone: p.phone,
+          birthDate: toUTCDate(p.birthDate),
+          attendance: isAttend
+            ? AttendanceStatus.ATTEND
+            : AttendanceStatus.DECLINE,
+          invitationToken: { connect: { id: tok.id } },
+        },
+        select: { id: true },
+      });
+
+      // 3-3) Allergies only when attending (フォーム仕様的にも出席時のみ入力)
+      if (isAttend && p.allergies.length > 0) {
+        // split dog / food
+        const dog = p.allergies.find((a) => a.type === "dog");
+        const foods = p.allergies.filter((a) => a.type === "food");
+
+        // dog allergy
+        if (dog) {
+          const allergenId = await findOrCreateAllergen(
+            AllergenCategory.DOG,
+            dog.allergen || "犬"
+          );
+          await tx.guestAllergy.create({
+            data: { guestId: g.id, allergenId },
+          });
+        }
+
+        // food allergies (dedup by name)
+        const uniqueFoodNames = Array.from(
+          new Set(foods.map((f) => f.allergen.trim()).filter(Boolean))
+        );
+        if (uniqueFoodNames.length > 0) {
+          for (const name of uniqueFoodNames) {
+            const allergenId = await findOrCreateAllergen(
+              AllergenCategory.FOOD,
+              name
+            );
+            await tx.guestAllergy.create({
+              data: { guestId: g.id, allergenId },
+            });
+          }
+        }
+      }
+    }
+  });
+
+  // 4) Revalidate only (no redirect)
+  revalidatePath("/");      // トップ
+  revalidatePath("/admin"); // 管理画面
+
+  // 5) (任意) 成功オブジェクトを返す — フロントでトースト等に利用可
+  return { success: true };
 }
