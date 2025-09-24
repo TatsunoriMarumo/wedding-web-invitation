@@ -12,15 +12,14 @@ export async function verifyInviteToken(token: string | null | undefined): Promi
     return { ok: false, reason: "NOT_PROVIDED" };
   }
 
-  // InvitationToken の実カラムに合わせて select を定義する
-  // ※ スキーマが isUsed(boolean) と usedAt(Date | null) の構成を想定
+  // InvitationToken の実カラムに合わせて select を定義
+  // isUsed: boolean, usedAt: Date | null, inviteeName: string | null を想定
   const row = await prisma.invitationToken.findUnique({
     where: { token },
     select: {
       id: true,
       token: true,
       inviteeName: true,
-      // どちらか片方しか無いプロジェクトでも安全に動くよう両方選択
       isUsed: true,
       usedAt: true,
     },
@@ -28,14 +27,12 @@ export async function verifyInviteToken(token: string | null | undefined): Promi
 
   if (!row) return { ok: false, reason: "NOT_FOUND" };
 
-  // boolean運用/日時運用の両対応
-  const usedByFlag = typeof (row as any).isUsed === "boolean" && (row as any).isUsed === true;
-  const usedByDate = !!(row as any).usedAt;
-  const isUsed = usedByFlag || usedByDate;
+  // boolean と日時のどちらでも「使用済み」と判断
+  const isUsed = row.isUsed === true || row.usedAt !== null;
 
   if (isUsed) {
-    return { ok: false, reason: "USED", inviteeName: (row as any).inviteeName ?? null };
+    return { ok: false, reason: "USED", inviteeName: row.inviteeName ?? null };
   }
 
-  return { ok: true, inviteeName: (row as any).inviteeName ?? null };
+  return { ok: true, inviteeName: row.inviteeName ?? null };
 }

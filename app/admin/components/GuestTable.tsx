@@ -14,20 +14,28 @@ interface GuestTableProps {
   onExportClick: () => void;
 }
 
-const formatBirthdate = (bd: unknown) => {
+/** birthDate の受け取りを限定して any を排除 */
+type BirthdateInput = string | number | Date | null | undefined;
+
+/** birthDate を持つかを安全に判定する type guard */
+type HasBirthDate = { birthDate?: BirthdateInput };
+const hasBirthDate = (v: unknown): v is HasBirthDate =>
+  typeof v === "object" && v !== null && "birthDate" in v;
+
+const formatBirthdate = (bd: BirthdateInput): string => {
   if (!bd) return "";
   if (typeof bd === "string") {
-    // ISOっぽい"YYYY-MM-DD"をスラッシュに
+    // "YYYY-MM-DD" を "YYYY/MM/DD" に整形（それ以外は Date に委譲）
     const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
   }
-  if (bd instanceof Date) return bd.toLocaleDateString("ja-JP");
-  // 予期せぬ型でも Date に投げる
-  try {
-    return new Date(bd as any).toLocaleDateString("ja-JP");
-  } catch {
-    return "";
+  if (typeof bd === "number") {
+    return new Date(bd).toLocaleDateString("ja-JP");
   }
+  if (bd instanceof Date) {
+    return bd.toLocaleDateString("ja-JP");
+  }
+  return "";
 };
 
 export function GuestTable({ guests, onExportClick }: GuestTableProps) {
@@ -56,7 +64,6 @@ export function GuestTable({ guests, onExportClick }: GuestTableProps) {
                 <TableHead>{t("admin.guests.table.contact")}</TableHead>
                 <TableHead>{t("admin.guests.table.attendance")}</TableHead>
                 <TableHead>{t("admin.guests.table.allergies")}</TableHead>
-                {/* ★ 生年月日列を追加 */}
                 <TableHead>{t("admin.guests.table.birthdate")}</TableHead>
                 <TableHead className="whitespace-nowrap">{t("admin.guests.table.registeredAt")}</TableHead>
               </TableRow>
@@ -91,9 +98,8 @@ export function GuestTable({ guests, onExportClick }: GuestTableProps) {
                       )}
                     </div>
                   </TableCell>
-                  {/* ★ 生年月日 */}
                   <TableCell className="whitespace-nowrap">
-                    {formatBirthdate((guest as any).birthDate)}
+                    {hasBirthDate(guest) ? formatBirthdate(guest.birthDate) : ""}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">
                     {new Date(guest.createdAt).toLocaleString("ja-JP")}

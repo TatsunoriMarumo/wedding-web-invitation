@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useOptimistic } from "react";
-import { Guest, InviteToken } from "@/lib/types";
+import type { Guest, InviteToken } from "@/lib/types";
 import { useLanguage } from "@/app/providers";
 import { StatsCards } from "./StatsCards";
 import { TokenTable } from "./TokenTable";
@@ -15,18 +15,28 @@ interface AdminDashboardProps {
   initialGuests: Guest[];
 }
 
-const formatBirthdate = (bd: unknown) => {
+/** 受け取りうる型を限定して any を排除 */
+type BirthdateInput = string | number | Date | null | undefined;
+
+/** birthDate を持っているかの type guard（any 不使用） */
+type HasBirthDate = { birthDate?: BirthdateInput };
+const hasBirthDate = (v: unknown): v is HasBirthDate =>
+  typeof v === "object" && v !== null && "birthDate" in v;
+
+const formatBirthdate = (bd: BirthdateInput): string => {
   if (!bd) return "";
   if (typeof bd === "string") {
     const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
   }
-  if (bd instanceof Date) return bd.toLocaleDateString("ja-JP");
-  try {
-    return new Date(bd as any).toLocaleDateString("ja-JP");
-  } catch {
-    return "";
+  if (typeof bd === "number") {
+    return new Date(bd).toLocaleDateString("ja-JP");
   }
+  if (bd instanceof Date) {
+    return bd.toLocaleDateString("ja-JP");
+  }
+  // ここに来ることはほぼ無いが、安全側で空文字
+  return "";
 };
 
 export function AdminDashboard({
@@ -35,7 +45,8 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const { t } = useLanguage();
   const [tokens, setTokens] = useState(initialTokens);
-  const [guests, setGuests] = useState(initialGuests);
+  // setGuests は未使用なのでタプルの 2 要素目を受け取らない
+  const [guests] = useState(initialGuests);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const [optimisticTokens, addOptimisticToken] = useOptimistic(
@@ -43,11 +54,11 @@ export function AdminDashboard({
     (state, action: { type: "add" | "delete"; token?: InviteToken; tokenId?: number }) => {
       if (action.type === "add" && action.token) {
         return [
-          { ...action.token, id: state.length > 0 ? Math.max(...state.map(t => t.id)) + 1 : 1 },
-          ...state
+          { ...action.token, id: state.length > 0 ? Math.max(...state.map((t) => t.id)) + 1 : 1 },
+          ...state,
         ];
       } else if (action.type === "delete" && action.tokenId !== undefined) {
-        return state.filter(t => t.id !== action.tokenId);
+        return state.filter((t) => t.id !== action.tokenId);
       }
       return state;
     }
@@ -59,11 +70,11 @@ export function AdminDashboard({
 
   const handleTokenDeleted = (tokenId: number) => {
     addOptimisticToken({ type: "delete", tokenId });
-    setTokens((prev) => prev.filter(t => t.id !== tokenId));
+    setTokens((prev) => prev.filter((t) => t.id !== tokenId));
   };
 
   const exportToExcel = () => {
-    // ★ CSVに生年月日列を追加
+    // CSV に生年月日列を追加（any 不使用）
     const csvContent = [
       ["姓", "名", "メールアドレス", "電話番号", "出欠", "アレルギー", "生年月日", "登録日時"],
       ...guests.map((guest) => [
@@ -73,7 +84,7 @@ export function AdminDashboard({
         guest.phone || "",
         guest.attendance === "ATTEND" ? "出席" : "欠席",
         guest.allergies.map((a) => a.allergen.name).join(", "),
-        formatBirthdate((guest as any).birthDate),
+        formatBirthdate(hasBirthDate(guest) ? guest.birthDate : undefined),
         new Date(guest.createdAt).toLocaleString("ja-JP"),
       ]),
     ]
@@ -84,7 +95,10 @@ export function AdminDashboard({
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
-    link.setAttribute("download", `参加者一覧_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute(
+      "download",
+      `参加者一覧_${new Date().toISOString().split("T")[0]}.csv`
+    );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -110,10 +124,7 @@ export function AdminDashboard({
         </TabsContent>
 
         <TabsContent value="guests">
-          <GuestTable
-            guests={guests}
-            onExportClick={exportToExcel}
-          />
+          <GuestTable guests={guests} onExportClick={exportToExcel} />
         </TabsContent>
       </Tabs>
 
