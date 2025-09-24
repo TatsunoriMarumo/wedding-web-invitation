@@ -1,7 +1,7 @@
 // app/(your-route)/RsvpForm.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { submitRsvp } from "@/app/rsvp/actions";
@@ -39,6 +39,26 @@ interface RsvpFormState {
 /* ===========================
  * Utilities
  * =========================== */
+
+type SubmitState = { success: boolean | null; error?: string };
+const initialSubmitState: SubmitState = { success: null };
+
+// Server Action（submitRsvp）が返す { success: boolean } を
+// useActionState 経由で "次の state" に変換する
+const [submitState, formAction] = useActionState(
+  async (_prev: SubmitState, fd: FormData): Promise<SubmitState> => {
+    try {
+      const res = await submitRsvp(fd); // ← { success: boolean } を想定
+      return { success: !!res?.success };
+    } catch (e) {
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : "送信に失敗しました",
+      };
+    }
+  },
+  initialSubmitState
+);
 
 /* ===========================
  * Birthdate (JP) Component - FIXED TYPINGS
@@ -531,7 +551,7 @@ export default function RsvpForm({ token }: { token: string }) {
         ))}
       </div>
 
-      <form action={submitRsvp} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+      <form action={formAction} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
         {/* サーバーへ渡す JSON */}
         <input type="hidden" name="payload" value={payload} readOnly />
 
