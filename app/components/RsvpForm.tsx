@@ -43,23 +43,6 @@ interface RsvpFormState {
 type SubmitState = { success: boolean | null; error?: string };
 const initialSubmitState: SubmitState = { success: null };
 
-// Server Action（submitRsvp）が返す { success: boolean } を
-// useActionState 経由で "次の state" に変換する
-const [submitState, formAction] = useActionState(
-  async (_prev: SubmitState, fd: FormData): Promise<SubmitState> => {
-    try {
-      const res = await submitRsvp(fd); // ← { success: boolean } を想定
-      return { success: !!res?.success };
-    } catch (e) {
-      return {
-        success: false,
-        error: e instanceof Error ? e.message : "送信に失敗しました",
-      };
-    }
-  },
-  initialSubmitState
-);
-
 /* ===========================
  * Birthdate (JP) Component - FIXED TYPINGS
  * =========================== */
@@ -340,11 +323,10 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(false)}
             aria-pressed={!hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${
-              !hasDogAllergy
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${!hasDogAllergy
                 ? "border-green-500 bg-green-50 text-green-700"
                 : "border-gray-200 hover:border-green-300"
-            }`}
+              }`}
           >
             {t("rsvp.form.health.no")}
           </button>
@@ -352,11 +334,10 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(true)}
             aria-pressed={hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${
-              hasDogAllergy
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${hasDogAllergy
                 ? "border-red-500 bg-red-50 text-red-700"
                 : "border-gray-200 hover:border-red-300"
-            }`}
+              }`}
           >
             {t("rsvp.form.health.yes")}
           </button>
@@ -449,6 +430,23 @@ function AllergyInput({
 export default function RsvpForm({ token }: { token: string }) {
   const { t } = useLanguage();
 
+  // Server Action（submitRsvp）が返す { success: boolean } を
+  // useActionState 経由で "次の state" に変換する
+  const [submitState, formAction] = useActionState(
+    async (_prev: SubmitState, fd: FormData): Promise<SubmitState> => {
+      try {
+        const res = await submitRsvp(fd); // ← { success: boolean } を想定
+        return { success: !!res?.success };
+      } catch (e) {
+        return {
+          success: false,
+          error: e instanceof Error ? e.message : "送信に失敗しました",
+        };
+      }
+    },
+    initialSubmitState
+  );
+
   const [formData, setFormData] = useState<RsvpFormState>({
     mainGuest: {
       id: "main",
@@ -538,9 +536,8 @@ export default function RsvpForm({ token }: { token: string }) {
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
-              }`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
+                }`}
             >
               {i + 1}
             </div>
@@ -633,11 +630,10 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, attendance: "attend" }))}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "attend"
+                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "attend"
                       ? "border-green-500 bg-green-50 text-green-700"
                       : "border-gray-200 hover:border-green-300"
-                  }`}
+                    }`}
                 >
                   ✅ {t("rsvp.form.attend")}
                 </button>
@@ -645,11 +641,10 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, attendance: "decline" }))}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "decline"
+                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "decline"
                       ? "border-red-500 bg-red-50 text-red-700"
                       : "border-gray-200 hover:border-red-300"
-                  }`}
+                    }`}
                 >
                   ❌ {t("rsvp.form.decline")}
                 </button>
