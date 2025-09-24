@@ -139,8 +139,8 @@ export const ja = {
         add: "同伴者を追加",
         firstnamePlaceholder: "名",
         lastnamePlaceholder: "姓",
-        emailPlaceholder: "メールアドレス（任意）",
-        phonePlaceholder: "電話番号（任意）",
+        emailPlaceholder: "メールアドレス",
+        phonePlaceholder: "電話番号",
         // ★ 追加
         birthdatePlaceholder: "生年月日",
         remove: "削除",
