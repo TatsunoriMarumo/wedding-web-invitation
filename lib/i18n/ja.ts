@@ -48,7 +48,7 @@ export const ja = {
         "結婚前から尻に敷かれてます",
       alt: "新郎の写真",
     },
-    
+
     bride: {
       name: "新婦 和田ひなの",
       message:
@@ -72,10 +72,10 @@ export const ja = {
     ok: {
       title: "推奨スタイル",
       memos: [
-      "明るく華やかな色のお洋服",
-      `季節を感じる
+        "明るく華やかな色のお洋服",
+        `季節を感じる
       彩りコーディネート`,
-      `会場を彩る
+        `会場を彩る
       カラフルなワンポイント`,
       ],
       alt: "推奨ドレスコード例",
@@ -193,6 +193,8 @@ export const ja = {
         birthdateInvalidFormat: "日付の形式は YYYY-MM-DD で入力してください",
         birthdateFuture: "生年月日が未来日です",
         fillCompanions: "同伴者も氏名と生年月日が必須です。",
+        invalidEmail: "メールアドレスの形式が正しくありません。",
+        invalidPhone: "電話番号の形式が正しくありません。",
       },
     },
   },
@@ -386,7 +388,7 @@ export const ja = {
       complete: "完了",
     },
   },
-    thankYou: {
+  thankYou: {
     title: "ご回答ありがとうございます",
     imageAlt: "RSVP 完了イメージ",
     badge: "RSVP 完了",

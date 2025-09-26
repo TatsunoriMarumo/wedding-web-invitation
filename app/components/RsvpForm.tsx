@@ -777,7 +777,7 @@ export default function RsvpForm({ token }: { token: string }) {
         )}
 
         {/* Step 4: 確認 */}
-        {step === 4 && (
+        {step === totalSteps && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">{t("rsvp.form.steps.confirm")}</h3>
 
