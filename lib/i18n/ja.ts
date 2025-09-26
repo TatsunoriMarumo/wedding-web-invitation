@@ -174,6 +174,15 @@ export const ja = {
       navigation: {
         back: "戻る",
         next: "次へ",
+        checking: "確認中…",
+      },
+
+      error: {
+        duplicateMain:
+          "すでに登録済みの方が見つかりました（同姓・同名・生年月日が一致）。内容をご確認ください。",
+        duplicateCompanions:
+          "同伴者の中に既に登録済みの方が見つかりました：{{names}}",
+        submitFailed: "送信に失敗しました。時間をおいて再度お試しください。",
       },
 
       validation: {

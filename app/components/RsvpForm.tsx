@@ -1,12 +1,9 @@
-// app/(your-route)/RsvpForm.tsx
 "use client";
 
-import { useState, useMemo, useEffect, useActionState } from "react";
+import { useState, useMemo, useEffect, useActionState, startTransition } from "react";
 import { useFormStatus } from "react-dom";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
-import { submitRsvp } from "@/app/rsvp/actions";
-
-// 多言語フック（あなたの実装に合わせて import パスを調整）
+import { submitRsvp, checkDuplicateAction, checkDuplicateDirect } from "@/app/rsvp/actions";
 import { useLanguage } from "../providers";
 
 /* ===========================
@@ -25,7 +22,7 @@ interface Person {
   firstName: string;
   email: string;
   phone: string;
-  // ストアする値は ISO（YYYY-MM-DD）に統一
+  // ISO: YYYY-MM-DD
   birthDate: string;
   allergies: AllergyItem[];
 }
@@ -36,31 +33,47 @@ interface RsvpFormState {
   companions: Person[];
 }
 
+type Step = 1 | 2 | 3 | 4;
+
+type DupResult = { ok: boolean; error?: string };
+type SubmitState = { success: boolean; error?: string };
+
 /* ===========================
  * Utilities
  * =========================== */
 
-type SubmitState = { success: boolean | null; error?: string };
-const initialSubmitState: SubmitState = { success: null };
-
-/* ===========================
- * Birthdate (JP) Component - FIXED TYPINGS
- * =========================== */
-
-type YMD = { y: number | ""; m: number | ""; d: number | "" };
-
 const pad2 = (n: number) => String(n).padStart(2, "0");
+const ymdToISO = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
+const isoToSlash = (iso: string) => (iso ? iso.replaceAll("-", "/") : "");
 const isValidYMD = (y?: number, m?: number, d?: number) => {
   if (!y || !m || !d) return false;
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return (
-    dt.getUTCFullYear() === y &&
-    dt.getUTCMonth() + 1 === m &&
-    dt.getUTCDate() === d
-  );
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === m && dt.getUTCDate() === d;
 };
-const ymdToISO = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
-const isoToSlash = (iso: string) => iso ? iso.replaceAll("-", "/") : "";
+
+// エラーを常に string に正規化
+function normalizeError(e: unknown): string {
+  if (e == null) return "不明なエラーが発生しました。";
+  if (typeof e === "string") return e;
+  if (e instanceof Error) return e.message;
+  if (Array.isArray(e)) {
+    return e
+      .flat(Infinity as 1)
+      .filter((x): x is string => typeof x === "string")
+      .join(" / ");
+  }
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+}
+
+/* ===========================
+ * Birthdate (JP)
+ * =========================== */
+
+type YMD = { y: number | ""; m: number | ""; d: number | "" };
 
 function BirthdateJP({
   label,
@@ -69,7 +82,7 @@ function BirthdateJP({
   required,
 }: {
   label: string;
-  value: string;               // YYYY-MM-DD (親に保持される最終値)
+  value: string; // YYYY-MM-DD
   onChange: (iso: string) => void;
   required?: boolean;
 }) {
@@ -79,35 +92,27 @@ function BirthdateJP({
   }, []);
   const START_YEAR = 1900;
 
-  // 親の ISO → ローカル初期値
   const parseISO = (iso?: string): YMD => {
     const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return { y: "", m: "", d: "" };
     return { y: parseInt(m[1], 10), m: parseInt(m[2], 10), d: parseInt(m[3], 10) };
-    //      ^^^^^^^^^^^^^^^^^^^^^^^ すべて number 型に
   };
 
   const [local, setLocal] = useState<YMD>(() => parseISO(value));
+  useEffect(() => setLocal(parseISO(value)), [value]);
 
-  useEffect(() => {
-    setLocal(parseISO(value));
-  }, [value]);
-
-  // 年の候補（降順：今年→1900）
   const years = useMemo(() => {
     const arr: number[] = [];
     for (let y = today.y; y >= START_YEAR; y--) arr.push(y);
     return arr;
   }, [today.y]);
 
-  // 月の候補（当年は未来月を出さない）
   const months = useMemo(() => {
     if (local.y === "") return [];
     const maxM = local.y === today.y ? today.m : 12;
     return Array.from({ length: maxM }, (_, i) => i + 1);
   }, [local.y, today.y, today.m]);
 
-  // 日の候補（当年月は未来日を出さない）
   const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
   const days = useMemo(() => {
     if (local.y === "" || local.m === "") return [];
@@ -126,7 +131,7 @@ function BirthdateJP({
         return;
       }
     }
-    onChange(""); // 未完成/不正は空で必須バリデーションを効かせる
+    onChange(""); // 未完成/不正は空 → 必須バリデーションで弾く
   };
 
   const onYearChange = (val: string) => {
@@ -197,7 +202,9 @@ function BirthdateJP({
         >
           <option value="">年</option>
           {years.map((y) => (
-            <option key={y} value={y}>{y}年</option>
+            <option key={y} value={y}>
+              {y}年
+            </option>
           ))}
         </select>
 
@@ -211,7 +218,9 @@ function BirthdateJP({
         >
           <option value="">月</option>
           {months.map((m) => (
-            <option key={m} value={m}>{m}月</option>
+            <option key={m} value={m}>
+              {m}月
+            </option>
           ))}
         </select>
 
@@ -225,7 +234,9 @@ function BirthdateJP({
         >
           <option value="">日</option>
           {days.map((d) => (
-            <option key={d} value={d}>{d}日</option>
+            <option key={d} value={d}>
+              {d}日
+            </option>
           ))}
         </select>
       </div>
@@ -233,7 +244,6 @@ function BirthdateJP({
     </div>
   );
 }
-
 
 /* ===========================
  * UI helpers
@@ -267,7 +277,7 @@ function SubmitButton() {
 }
 
 /* ===========================
- * Allergy Input Component
+ * Allergy Input
  * =========================== */
 
 function AllergyInput({
@@ -323,10 +333,9 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(false)}
             aria-pressed={!hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${!hasDogAllergy
-                ? "border-green-500 bg-green-50 text-green-700"
-                : "border-gray-200 hover:border-green-300"
-              }`}
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${
+              !hasDogAllergy ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
+            }`}
           >
             {t("rsvp.form.health.no")}
           </button>
@@ -334,10 +343,9 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(true)}
             aria-pressed={hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${hasDogAllergy
-                ? "border-red-500 bg-red-50 text-red-700"
-                : "border-gray-200 hover:border-red-300"
-              }`}
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${
+              hasDogAllergy ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
+            }`}
           >
             {t("rsvp.form.health.yes")}
           </button>
@@ -430,21 +438,27 @@ function AllergyInput({
 export default function RsvpForm({ token }: { token: string }) {
   const { t } = useLanguage();
 
-  // Server Action（submitRsvp）が返す { success: boolean } を
-  // useActionState 経由で "次の state" に変換する
-  const [submitState, formAction] = useActionState(
-    async (_prev: SubmitState, fd: FormData): Promise<SubmitState> => {
+  // --- 重複チェック（Step1 代表者） ---
+  const [dupState, dupFormAction, dupPending] = useActionState<DupResult, FormData>(
+    checkDuplicateAction,
+    { ok: false }
+  );
+  const [dupError, setDupError] = useState<string | null>(null);
+
+  // --- 送信（最終確認で submit） ---
+  const [submitState, formAction] = useActionState<SubmitState, FormData>(
+    async (_prev, fd) => {
       try {
-        const res = await submitRsvp(fd); // ← { success: boolean } を想定
-        return { success: !!res?.success };
-      } catch (e) {
-        return {
-          success: false,
-          error: e instanceof Error ? e.message : "送信に失敗しました",
-        };
+        const res: any = await submitRsvp(fd);
+        if (!res || res.success !== true) {
+          return { success: false, error: normalizeError(res?.error) };
+        }
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: normalizeError(err) };
       }
     },
-    initialSubmitState
+    { success: false }
   );
 
   const [formData, setFormData] = useState<RsvpFormState>({
@@ -454,34 +468,38 @@ export default function RsvpForm({ token }: { token: string }) {
       firstName: "",
       email: "",
       phone: "",
-      birthDate: "", // ★ 必須（ISO: YYYY-MM-DD）
+      birthDate: "",
       allergies: [],
     },
     attendance: "",
     companions: [],
   });
 
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [step, setStep] = useState<Step>(1);
+  const nextStep = () => setStep((s) => (s === 1 ? 2 : s === 2 ? 3 : s === 3 ? 4 : 4));
+  const prevStep = () => setStep((s) => (s === 4 ? 3 : s === 3 ? 2 : s === 2 ? 1 : 1));
 
   const totalSteps = useMemo(() => (formData.attendance === "attend" ? 4 : 2), [formData.attendance]);
 
   const guests = useMemo<Person[]>(
-    () =>
-      formData.attendance === "attend"
-        ? [formData.mainGuest, ...formData.companions]
-        : [formData.mainGuest],
-    [formData],
+    () => (formData.attendance === "attend" ? [formData.mainGuest, ...formData.companions] : [formData.mainGuest]),
+    [formData]
   );
 
   const payload = useMemo(
-    () =>
-      JSON.stringify({
-        token,
-        attendance: formData.attendance,
-        guests,
-      }),
-    [token, formData, guests],
+    () => JSON.stringify({ token, attendance: formData.attendance, guests }),
+    [token, formData, guests]
   );
+
+  // --- Step1 重複チェック結果で遷移 or エラー ---
+  useEffect(() => {
+    if (dupState.ok) {
+      setDupError(null);
+      nextStep();
+    } else if (dupState.error === "duplicate") {
+      setDupError(t("rsvp.form.error.duplicateMain"));
+    }
+  }, [dupState, t]);
 
   // 更新ユーティリティ
   const updateMainGuest = (updates: Partial<Person>) =>
@@ -492,15 +510,7 @@ export default function RsvpForm({ token }: { token: string }) {
       ...p,
       companions: [
         ...p.companions,
-        {
-          id: crypto.randomUUID(),
-          lastName: "",
-          firstName: "",
-          email: "",
-          phone: "",
-          birthDate: "", // ★ 必須（ISO）
-          allergies: [],
-        },
+        { id: crypto.randomUUID(), lastName: "", firstName: "", email: "", phone: "", birthDate: "", allergies: [] },
       ],
     }));
 
@@ -508,10 +518,7 @@ export default function RsvpForm({ token }: { token: string }) {
     setFormData((p) => ({ ...p, companions: p.companions.filter((c) => c.id !== id) }));
 
   const updateCompanion = (id: string, updates: Partial<Person>) =>
-    setFormData((p) => ({
-      ...p,
-      companions: p.companions.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-    }));
+    setFormData((p) => ({ ...p, companions: p.companions.map((c) => (c.id === id ? { ...c, ...updates } : c)) }));
 
   // バリデーション（Next ボタン活性制御）
   const canGoNextStep1 =
@@ -522,10 +529,7 @@ export default function RsvpForm({ token }: { token: string }) {
     !!formData.mainGuest.birthDate &&
     !!formData.attendance;
 
-  const companionsOk =
-    formData.companions.every(
-      (c) => !!c.lastName && !!c.firstName && !!c.birthDate, // email/phoneは任意
-    );
+  const companionsOk = formData.companions.every((c) => !!c.lastName && !!c.firstName && !!c.birthDate);
 
   const currentStepNumber = step;
 
@@ -536,14 +540,13 @@ export default function RsvpForm({ token }: { token: string }) {
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
-                }`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
+              }`}
             >
               {i + 1}
             </div>
-            {i < totalSteps - 1 && (
-              <div className={`w-12 h-1 mx-2 ${i + 1 < currentStepNumber ? "bg-pink-500" : "bg-gray-200"}`} />
-            )}
+            {i < totalSteps - 1 && <div className={`w-12 h-1 mx-2 ${i + 1 < currentStepNumber ? "bg-pink-500" : "bg-gray-200"}`} />}
           </div>
         ))}
       </div>
@@ -552,7 +555,17 @@ export default function RsvpForm({ token }: { token: string }) {
         {/* サーバーへ渡す JSON */}
         <input type="hidden" name="payload" value={payload} readOnly />
 
-        {/* Step 1: 代表者の基本情報 */}
+        {/* エラーバナー（重複／送信） */}
+        {dupError && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">{dupError}</div>
+        )}
+        {submitState.error && (
+          <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+            {submitState.error}
+          </div>
+        )}
+
+        {/* Step 1: 代表者基本情報 */}
         {step === 1 && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">{t("rsvp.form.steps.basic")}</h3>
@@ -585,7 +598,7 @@ export default function RsvpForm({ token }: { token: string }) {
               </div>
             </div>
 
-            {/* ★ 生年月日（日本式：年/月/日） */}
+            {/* 生年月日 */}
             <BirthdateJP
               label={t("rsvp.form.birthdate")}
               value={formData.mainGuest.birthDate}
@@ -630,10 +643,9 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, attendance: "attend" }))}
-                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "attend"
-                      ? "border-green-500 bg-green-50 text-green-700"
-                      : "border-gray-200 hover:border-green-300"
-                    }`}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.attendance === "attend" ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
+                  }`}
                 >
                   ✅ {t("rsvp.form.attend")}
                 </button>
@@ -641,10 +653,9 @@ export default function RsvpForm({ token }: { token: string }) {
                 <button
                   type="button"
                   onClick={() => setFormData((p) => ({ ...p, attendance: "decline" }))}
-                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "decline"
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-gray-200 hover:border-red-300"
-                    }`}
+                  className={`p-4 rounded-xl border-2 transition-all ${
+                    formData.attendance === "decline" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
+                  }`}
                 >
                   ❌ {t("rsvp.form.decline")}
                 </button>
@@ -653,7 +664,7 @@ export default function RsvpForm({ token }: { token: string }) {
           </div>
         )}
 
-        {/* Step 2: 本人アレルギー（出席のみ） */}
+        {/* Step 2: 本人アレルギー（出席時） */}
         {step === 2 && formData.attendance === "attend" && (
           <div className="space-y-6">
             <h3 className="text-2xl font-semibold text-gray-800 mb-6">
@@ -666,19 +677,14 @@ export default function RsvpForm({ token }: { token: string }) {
               </p>
             </div>
 
-            <AllergyInput
-              person={formData.mainGuest}
-              onUpdate={(allergies) => updateMainGuest({ allergies })}
-            />
+            <AllergyInput person={formData.mainGuest} onUpdate={(allergies) => updateMainGuest({ allergies })} />
           </div>
         )}
 
-        {/* Step 3: 同伴者（出席のみ） */}
+        {/* Step 3: 同伴者（出席時） */}
         {step === 3 && formData.attendance === "attend" && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.attendance")}
-            </h3>
+            <h3 className="text-2xl font-semibold text-gray-800 mb-6">{t("rsvp.form.steps.attendance")}</h3>
 
             <div className="flex items-center justify-end">
               <button
@@ -732,7 +738,7 @@ export default function RsvpForm({ token }: { token: string }) {
                       />
                     </div>
 
-                    {/* ★ 生年月日（日本式） */}
+                    {/* 生年月日（日本式） */}
                     <BirthdateJP
                       label={t("rsvp.form.birthdate")}
                       value={companion.birthDate}
@@ -757,9 +763,7 @@ export default function RsvpForm({ token }: { token: string }) {
                     />
 
                     <div className="border-t pt-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">
-                        {t("rsvp.form.steps.health")}
-                      </h5>
+                      <h5 className="text-sm font-medium text-gray-700 mb-3">{t("rsvp.form.steps.health")}</h5>
                       <AllergyInput
                         person={companion}
                         onUpdate={(allergies) => updateCompanion(companion.id, { allergies })}
@@ -775,22 +779,16 @@ export default function RsvpForm({ token }: { token: string }) {
         {/* Step 4: 確認 */}
         {step === 4 && (
           <div className="space-y-6">
-            <h3 className="text-2xl font-semibold text-gray-800 mb-6">
-              {t("rsvp.form.steps.confirm")}
-            </h3>
+            <h3 className="text-2xl font-semibold text-gray-800 mb-6">{t("rsvp.form.steps.confirm")}</h3>
 
             <div className="bg-gray-50 rounded-xl p-6">
               <div className="divide-y divide-gray-200">
                 {/* 代表者 */}
                 <div className="py-4">
-                  <h4 className="font-medium text-gray-700 mb-2">
-                    {t("rsvp.form.confirmation.mainGuest")}
-                  </h4>
+                  <h4 className="font-medium text-gray-700 mb-2">{t("rsvp.form.confirmation.mainGuest")}</h4>
                   <div className="space-y-2 text-sm text-gray-800">
                     <div>
-                      <span className="font-medium w-24 inline-block">
-                        {t("rsvp.form.confirmation.name")}
-                      </span>
+                      <span className="font-medium w-24 inline-block">{t("rsvp.form.confirmation.name")}</span>
                       {formData.mainGuest.lastName} {formData.mainGuest.firstName}
                     </div>
                     <div>
@@ -802,25 +800,17 @@ export default function RsvpForm({ token }: { token: string }) {
                       {formData.mainGuest.phone}
                     </div>
                     <div>
-                      <span className="font-medium w-24 inline-block">
-                        {t("rsvp.form.birthdate")}
-                      </span>
+                      <span className="font-medium w-24 inline-block">{t("rsvp.form.birthdate")}</span>
                       {isoToSlash(formData.mainGuest.birthDate)}
                     </div>
                     <div>
-                      <span className="font-medium w-24 inline-block">
-                        {t("rsvp.form.confirmation.attendance")}
-                      </span>
+                      <span className="font-medium w-24 inline-block">{t("rsvp.form.confirmation.attendance")}</span>
                       <span
                         className={
-                          formData.attendance === "attend"
-                            ? "text-green-600 font-semibold"
-                            : "text-red-600 font-semibold"
+                          formData.attendance === "attend" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"
                         }
                       >
-                        {formData.attendance === "attend"
-                          ? t("rsvp.form.attend")
-                          : t("rsvp.form.decline")}
+                        {formData.attendance === "attend" ? t("rsvp.form.attend") : t("rsvp.form.decline")}
                       </span>
                     </div>
                     {formData.attendance === "attend" && formData.mainGuest.allergies.length > 0 && (
@@ -845,9 +835,7 @@ export default function RsvpForm({ token }: { token: string }) {
                       </h4>
                       <div className="space-y-2 text-sm text-gray-800">
                         <div>
-                          <span className="font-medium w-24 inline-block">
-                            {t("rsvp.form.confirmation.name")}
-                          </span>
+                          <span className="font-medium w-24 inline-block">{t("rsvp.form.confirmation.name")}</span>
                           {c.lastName} {c.firstName}
                         </div>
                         {c.email && (
@@ -863,9 +851,7 @@ export default function RsvpForm({ token }: { token: string }) {
                           </div>
                         )}
                         <div>
-                          <span className="font-medium w-24 inline-block">
-                            {t("rsvp.form.birthdate")}
-                          </span>
+                          <span className="font-medium w-24 inline-block">{t("rsvp.form.birthdate")}</span>
                           {isoToSlash(c.birthDate)}
                         </div>
                         {c.allergies.length > 0 && (
@@ -873,9 +859,7 @@ export default function RsvpForm({ token }: { token: string }) {
                             <span className="font-medium w-24 inline-block flex-shrink-0">
                               {t("rsvp.form.confirmation.allergy")}
                             </span>
-                            <span className="break-words">
-                              {c.allergies.map((a) => a.allergen).join("、")}
-                            </span>
+                            <span className="break-words">{c.allergies.map((a) => a.allergen).join("、")}</span>
                           </div>
                         )}
                       </div>
@@ -892,7 +876,7 @@ export default function RsvpForm({ token }: { token: string }) {
           {step > 1 && (
             <button
               type="button"
-              onClick={() => setStep((s) => (s > 1 ? ((s - 1) as typeof s) : s))}
+              onClick={prevStep}
               className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
             >
               {t("rsvp.form.navigation.back")}
@@ -903,21 +887,58 @@ export default function RsvpForm({ token }: { token: string }) {
           {step < totalSteps ? (
             <button
               type="button"
-              onClick={() => {
-                if (step === 1 && !canGoNextStep1) {
-                  alert(t("rsvp.form.validation.selectAttendance"));
+              onClick={async () => {
+                // Step1: 代表者の重複チェック（サーバー）
+                if (step === 1) {
+                  if (!canGoNextStep1) {
+                    alert(t("rsvp.form.validation.selectAttendance"));
+                    return;
+                  }
+                  setDupError(null);
+                  const fd = new FormData();
+                  fd.set("lastName", formData.mainGuest.lastName.trim());
+                  fd.set("firstName", formData.mainGuest.firstName.trim());
+                  fd.set("birthDate", formData.mainGuest.birthDate);
+                  startTransition(() => {
+                    dupFormAction(fd); 
+                  })
                   return;
                 }
-                if (step === 3 && !companionsOk) {
-                  alert(t("rsvp.form.validation.fillCompanions"));
-                  return;
+
+                // Step3: 同伴者の重複チェック（サーバーを直接呼ぶ）
+                if (step === 3) {
+                  if (!companionsOk) {
+                    alert(t("rsvp.form.validation.fillCompanions"));
+                    return;
+                  }
+                  setDupError(null);
+
+                  const results = await Promise.all(
+                    formData.companions.map((c) =>
+                      checkDuplicateDirect({
+                        lastName: c.lastName.trim(),
+                        firstName: c.firstName.trim(),
+                        birthDate: c.birthDate,
+                      })
+                    )
+                  );
+
+                  const dups: string[] = results
+                    .map((r, idx) => (r?.ok === false ? `${formData.companions[idx].lastName} ${formData.companions[idx].firstName}（${isoToSlash(formData.companions[idx].birthDate)}）` : null))
+                    .filter((s): s is string => !!s);
+
+                  if (dups.length) {
+                    setDupError(t("rsvp.form.error.duplicateCompanions", { names: dups.join("、") }));
+                    return;
+                  }
                 }
-                setStep((s) => ((s + 1) as typeof s));
+
+                nextStep();
               }}
-              disabled={(step === 1 && !canGoNextStep1) || (step === 3 && !companionsOk)}
+              disabled={dupPending || (step === 1 && !canGoNextStep1) || (step === 3 && !companionsOk)}
               className="ml-auto px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:bg-gray-300 transition-colors"
             >
-              {t("rsvp.form.navigation.next")}
+              {dupPending ? t("rsvp.form.navigation.checking") : t("rsvp.form.navigation.next")}
             </button>
           ) : (
             <div className="ml-auto">

@@ -54,7 +54,8 @@ model Guest {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
-  @@index([lastName, firstName])
+  @@index([lastName, firstName, birthDate])
+  @@unique([lastName, firstName, birthDate], map: "uniq_guest_name_dob")
   @@index([attendance])
   @@index([invitationTokenId])
 }

@@ -69,98 +69,161 @@ async function findOrCreateAllergen(
 /* ===========================
  * Main Server Action
  * =========================== */
-export async function submitRsvp(formData: FormData) {
-  // 1) Parse + validate payload
-  const raw = formData.get("payload");
-  if (typeof raw !== "string") {
-    throw new Error("Invalid form payload.");
-  }
-  const parsed = payloadSchema.safeParse(JSON.parse(raw));
-  if (!parsed.success) {
-    // フロントに詳細を返したい場合はここで整形して返す
-    throw new Error("Validation failed.");
-  }
-  const { token, attendance, guests } = parsed.data;
+export async function submitRsvp(formData: FormData): Promise<{ success: boolean; error?: unknown }> {
 
-  // 2) Token checks (RESUBMIT不可)
-  const tok = await prisma.invitationToken.findUnique({
-    where: { token },
-    select: { id: true, isUsed: true }, // schema に usedAt がある場合は適宜 select 追加可
-  });
-  if (!tok) {
-    throw new Error("Invalid invitation token.");
-  }
-  if (tok.isUsed) {
-    throw new Error("This invitation link has already been used.");
-  }
+  try {
+    // 1) Parse + validate payload
+    const raw = formData.get("payload");
+    if (typeof raw !== "string") {
+      throw new Error("Invalid form payload.");
+    }
+    const parsed = payloadSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) {
+      // フロントに詳細を返したい場合はここで整形して返す
+      throw new Error("Validation failed.");
+    }
+    const { token, attendance, guests } = parsed.data;
 
-  // 3) Persist (single transaction)
-  await prisma.$transaction(async (tx) => {
-    // 3-1) Mark token used first (single-use guarantee)
-    await tx.invitationToken.update({
-      where: { id: tok.id },
-      data: { isUsed: true },
+    // 2) Token checks (RESUBMIT不可)
+    const tok = await prisma.invitationToken.findUnique({
+      where: { token },
+      select: { id: true, isUsed: true }, // schema に usedAt がある場合は適宜 select 追加可
     });
+    if (!tok) {
+      throw new Error("Invalid invitation token.");
+    }
+    if (tok.isUsed) {
+      throw new Error("This invitation link has already been used.");
+    }
 
-    // 3-2) Create guests
-    const isAttend = attendance === "attend";
-
-    for (const p of guests) {
-      const g = await tx.guest.create({
-        data: {
-          lastName: p.lastName,
-          firstName: p.firstName,
-          email: p.email,
-          phone: p.phone,
-          birthDate: toUTCDate(p.birthDate),
-          attendance: isAttend
-            ? AttendanceStatus.ATTEND
-            : AttendanceStatus.DECLINE,
-          invitationToken: { connect: { id: tok.id } },
-        },
-        select: { id: true },
+    // 3) Persist (single transaction)
+    await prisma.$transaction(async (tx) => {
+      // 3-1) Mark token used first (single-use guarantee)
+      await tx.invitationToken.update({
+        where: { id: tok.id },
+        data: { isUsed: true },
       });
 
-      // 3-3) Allergies only when attending (フォーム仕様的にも出席時のみ入力)
-      if (isAttend && p.allergies.length > 0) {
-        // split dog / food
-        const dog = p.allergies.find((a) => a.type === "dog");
-        const foods = p.allergies.filter((a) => a.type === "food");
+      // 3-2) Create guests
+      const isAttend = attendance === "attend";
 
-        // dog allergy
-        if (dog) {
-          const allergenId = await findOrCreateAllergen(
-            AllergenCategory.DOG,
-            dog.allergen || "犬"
-          );
-          await tx.guestAllergy.create({
-            data: { guestId: g.id, allergenId },
-          });
-        }
+      for (const p of guests) {
+        const g = await tx.guest.create({
+          data: {
+            lastName: p.lastName,
+            firstName: p.firstName,
+            email: p.email,
+            phone: p.phone,
+            birthDate: toUTCDate(p.birthDate),
+            attendance: isAttend
+              ? AttendanceStatus.ATTEND
+              : AttendanceStatus.DECLINE,
+            invitationToken: { connect: { id: tok.id } },
+          },
+          select: { id: true },
+        });
 
-        // food allergies (dedup by name)
-        const uniqueFoodNames = Array.from(
-          new Set(foods.map((f) => f.allergen.trim()).filter(Boolean))
-        );
-        if (uniqueFoodNames.length > 0) {
-          for (const name of uniqueFoodNames) {
+        // 3-3) Allergies only when attending (フォーム仕様的にも出席時のみ入力)
+        if (isAttend && p.allergies.length > 0) {
+          // split dog / food
+          const dog = p.allergies.find((a) => a.type === "dog");
+          const foods = p.allergies.filter((a) => a.type === "food");
+
+          // dog allergy
+          if (dog) {
             const allergenId = await findOrCreateAllergen(
-              AllergenCategory.FOOD,
-              name
+              AllergenCategory.DOG,
+              dog.allergen || "犬"
             );
             await tx.guestAllergy.create({
               data: { guestId: g.id, allergenId },
             });
           }
+
+          // food allergies (dedup by name)
+          const uniqueFoodNames = Array.from(
+            new Set(foods.map((f) => f.allergen.trim()).filter(Boolean))
+          );
+          if (uniqueFoodNames.length > 0) {
+            for (const name of uniqueFoodNames) {
+              const allergenId = await findOrCreateAllergen(
+                AllergenCategory.FOOD,
+                name
+              );
+              await tx.guestAllergy.create({
+                data: { guestId: g.id, allergenId },
+              });
+            }
+          }
         }
       }
-    }
+    });
+
+    // 4) Revalidate only (no redirect)
+    revalidatePath("/");      // トップ
+    revalidatePath("/admin"); // 管理画面
+
+    // 5) (任意) 成功オブジェクトを返す — フロントでトースト等に利用可
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e };
+  }
+}
+
+
+type DupResult = { ok: boolean; error?: string };
+
+const dupInput = z.object({
+  lastName: z.string().trim().min(1),
+  firstName: z.string().trim().min(1),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+function dayRangeUTC(isoDate: string) {
+  const start = new Date(`${isoDate}T00:00:00.000Z`);
+  const end = new Date(`${isoDate}T23:59:59.999Z`);
+  return { start, end };
+}
+
+// --- Step1: useActionState 用（<form action> or dispatch で使う） ---
+export async function checkDuplicateAction(_prev: DupResult, formData: FormData): Promise<DupResult> {
+  const parsed = dupInput.parse({
+    lastName: String(formData.get("lastName") ?? ""),
+    firstName: String(formData.get("firstName") ?? ""),
+    birthDate: String(formData.get("birthDate") ?? ""),
   });
 
-  // 4) Revalidate only (no redirect)
-  revalidatePath("/");      // トップ
-  revalidatePath("/admin"); // 管理画面
+  const { start, end } = dayRangeUTC(parsed.birthDate);
 
-  // 5) (任意) 成功オブジェクトを返す — フロントでトースト等に利用可
-  return { success: true };
+  const hit = await prisma.guest.findFirst({
+    where: {
+      lastName: parsed.lastName,
+      firstName: parsed.firstName,
+      birthDate: { gte: start, lte: end },
+    },
+    select: { id: true },
+  });
+
+  return hit ? { ok: false, error: "duplicate" } : { ok: true };
+}
+
+// --- Step3: onClick から直接呼ぶ用（イベント時の直接呼び出し） ---
+export async function checkDuplicateDirect(input: {
+  lastName: string;
+  firstName: string;
+  birthDate: string; // YYYY-MM-DD
+}): Promise<DupResult> {
+  const parsed = dupInput.parse(input);
+  const { start, end } = dayRangeUTC(parsed.birthDate);
+
+  const hit = await prisma.guest.findFirst({
+    where: {
+      lastName: parsed.lastName,
+      firstName: parsed.firstName,
+      birthDate: { gte: start, lte: end },
+    },
+    select: { id: true },
+  });
+
+  return hit ? { ok: false, error: "duplicate" } : { ok: true };
 }
