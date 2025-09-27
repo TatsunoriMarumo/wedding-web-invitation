@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { submitRsvp, checkDuplicateAction, checkDuplicateDirect } from "@/app/rsvp/actions";
 import { useLanguage } from "../providers";
+import { z } from "zod";
 
 /* ===========================
  * Types
@@ -435,6 +436,11 @@ function AllergyInput({
  * Main Form
  * =========================== */
 
+type FieldErrors = {
+  mainGuest: { email?: string; phone?: string; attendance?: string };
+  companions: Record<string, { email?: string; phone?: string; requiredName?: boolean; requiredBirth?: boolean }>;
+};
+
 export default function RsvpForm({ token }: { token: string }) {
   const { t } = useLanguage();
 
@@ -474,6 +480,26 @@ export default function RsvpForm({ token }: { token: string }) {
     attendance: "",
     companions: [],
   });
+
+  const [errors, setErrors] = useState<FieldErrors>({ mainGuest: {}, companions: {} });
+
+  // スキーマ（t を使いたいのでコンポーネント内で作る）
+  const EmailSchema = useMemo(
+    () => z.string().trim().email({ message: t("rsvp.form.validation.invalidEmail") }),
+    [t]
+  );
+  const PhoneSchema = useMemo(
+    () =>
+      z
+        .string()
+        .trim()
+        .refine((v) => /^\+?[0-9\s\-()]+$/.test(v), t("rsvp.form.validation.invalidPhone"))
+        .refine((v) => {
+          const digits = v.replace(/\D/g, "");
+          return digits.length >= 8 && digits.length <= 15;
+        }, t("rsvp.form.validation.invalidPhone")),
+    [t]
+  );
 
   const [step, setStep] = useState<Step>(1);
   const nextStep = () => setStep((s) => (s === 1 ? 2 : s === 2 ? 3 : s === 3 ? 4 : 4));
@@ -520,7 +546,7 @@ export default function RsvpForm({ token }: { token: string }) {
   const updateCompanion = (id: string, updates: Partial<Person>) =>
     setFormData((p) => ({ ...p, companions: p.companions.map((c) => (c.id === id ? { ...c, ...updates } : c)) }));
 
-  // バリデーション（Next ボタン活性制御）
+  // 進行条件（※ presence 用。形式チェックは「次へ」クリック時に実施）
   const canGoNextStep1 =
     !!formData.mainGuest.lastName &&
     !!formData.mainGuest.firstName &&
@@ -532,6 +558,55 @@ export default function RsvpForm({ token }: { token: string }) {
   const companionsOk = formData.companions.every((c) => !!c.lastName && !!c.firstName && !!c.birthDate);
 
   const currentStepNumber = step;
+
+  // Step1: 形式チェック
+  const validateStep1 = (): boolean => {
+    const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
+
+    // 出欠
+    if (!formData.attendance) {
+      nextErrors.mainGuest.attendance = t("rsvp.form.validation.selectAttendance");
+    }
+
+    // Email
+    const e1 = EmailSchema.safeParse(formData.mainGuest.email.trim());
+    if (!e1.success) nextErrors.mainGuest.email = e1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
+
+    // Phone
+    const p1 = PhoneSchema.safeParse(formData.mainGuest.phone.trim());
+    if (!p1.success) nextErrors.mainGuest.phone = p1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidPhone");
+
+    setErrors(nextErrors);
+    return !nextErrors.mainGuest.email && !nextErrors.mainGuest.phone && !nextErrors.mainGuest.attendance;
+  };
+
+  // Step3: 同伴者のメール/電話だけ形式チェック（任意入力）
+  const validateStep3 = (): boolean => {
+    const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
+
+    // 必須（姓・名・誕生日）未入力の赤字も付ける
+    formData.companions.forEach((c) => {
+      const ce: { email?: string; phone?: string; requiredName?: boolean; requiredBirth?: boolean } = {};
+      if (!c.lastName || !c.firstName) ce.requiredName = true;
+      if (!c.birthDate) ce.requiredBirth = true;
+
+      if (c.email?.trim()) {
+        const r = EmailSchema.safeParse(c.email.trim());
+        if (!r.success) ce.email = r.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
+      }
+      if (c.phone?.trim()) {
+        const r = PhoneSchema.safeParse(c.phone.trim());
+        if (!r.success) ce.phone = r.error.issues[0]?.message ?? t("rsvp.form.validation.invalidPhone");
+      }
+      if (Object.keys(ce).length > 0) nextErrors.companions[c.id] = ce;
+    });
+
+    setErrors(nextErrors);
+    // 形式エラーがない & 必須OK
+    const noFormatError = Object.values(nextErrors.companions).every((v) => !v.email && !v.phone);
+    const requiredOK = formData.companions.every((c) => !!c.lastName && !!c.firstName && !!c.birthDate);
+    return noFormatError && requiredOK;
+  };
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -616,8 +691,14 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.email}
                   onChange={(e) => updateMainGuest({ email: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
+                    errors.mainGuest.email ? "border-red-500" : "border-gray-300"
+                  }`}
+                  aria-invalid={!!errors.mainGuest.email}
                 />
+                {errors.mainGuest.email && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.email}</p>
+                )}
               </div>
 
               <div>
@@ -629,8 +710,14 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.phone}
                   onChange={(e) => updateMainGuest({ phone: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
+                    errors.mainGuest.phone ? "border-red-500" : "border-gray-300"
+                  }`}
+                  aria-invalid={!!errors.mainGuest.phone}
                 />
+                {errors.mainGuest.phone && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.phone}</p>
+                )}
               </div>
             </div>
 
@@ -642,7 +729,10 @@ export default function RsvpForm({ token }: { token: string }) {
               <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
-                  onClick={() => setFormData((p) => ({ ...p, attendance: "attend" }))}
+                  onClick={() => {
+                    setFormData((p) => ({ ...p, attendance: "attend" }));
+                    setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
+                  }}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.attendance === "attend" ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
                   }`}
@@ -652,7 +742,10 @@ export default function RsvpForm({ token }: { token: string }) {
 
                 <button
                   type="button"
-                  onClick={() => setFormData((p) => ({ ...p, attendance: "decline" }))}
+                  onClick={() => {
+                    setFormData((p) => ({ ...p, attendance: "decline" }));
+                    setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
+                  }}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formData.attendance === "decline" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
                   }`}
@@ -660,6 +753,9 @@ export default function RsvpForm({ token }: { token: string }) {
                   ❌ {t("rsvp.form.decline")}
                 </button>
               </div>
+              {errors.mainGuest.attendance && (
+                <p className="mt-2 text-sm text-red-600">{errors.mainGuest.attendance}</p>
+              )}
             </div>
           </div>
         )}
@@ -703,74 +799,105 @@ export default function RsvpForm({ token }: { token: string }) {
               </div>
             ) : (
               <div className="space-y-6">
-                {formData.companions.map((companion, index) => (
-                  <div key={companion.id} className="border border-gray-200 rounded-lg p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-gray-700">
-                        {t("rsvp.form.companions.companionNumber")} {index + 1}
-                      </h4>
-                      <button
-                        type="button"
-                        onClick={() => removeCompanion(companion.id)}
-                        className="p-2 text-red-500 hover:text-red-600 transition-colors"
-                        aria-label="remove companion"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                {formData.companions.map((companion, index) => {
+                  const ce = errors.companions[companion.id] || {};
+                  return (
+                    <div key={companion.id} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-gray-700">
+                          {t("rsvp.form.companions.companionNumber")} {index + 1}
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => removeCompanion(companion.id)}
+                          className="p-2 text-red-500 hover:text-red-600 transition-colors"
+                          aria-label="remove companion"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <input
+                            type="text"
+                            required
+                            placeholder={`${t("rsvp.form.companions.lastnamePlaceholder")} *`}
+                            value={companion.lastName}
+                            onChange={(e) => updateCompanion(companion.id, { lastName: e.target.value })}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
+                              ce.requiredName ? "border-red-500" : "border-gray-300"
+                            }`}
+                          />
+                          {ce.requiredName && (
+                            <p className="mt-1 text-sm text-red-600">{t("rsvp.form.validation.fillCompanions")}</p>
+                          )}
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            required
+                            placeholder={`${t("rsvp.form.companions.firstnamePlaceholder")} *`}
+                            value={companion.firstName}
+                            onChange={(e) => updateCompanion(companion.id, { firstName: e.target.value })}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
+                              ce.requiredName ? "border-red-500" : "border-gray-300"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* 生年月日（日本式） */}
+                      <div className={ce.requiredBirth ? "border-red-500 rounded-lg" : ""}>
+                        <BirthdateJP
+                          label={t("rsvp.form.birthdate")}
+                          value={companion.birthDate}
+                          onChange={(iso) => updateCompanion(companion.id, { birthDate: iso })}
+                          required
+                        />
+                        {ce.requiredBirth && (
+                          <p className="mt-1 text-sm text-red-600">{t("rsvp.form.validation.fillCompanions")}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <input
+                          type="email"
+                          placeholder={t("rsvp.form.companions.emailPlaceholder")}
+                          value={companion.email}
+                          onChange={(e) => updateCompanion(companion.id, { email: e.target.value })}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+                            ce.email ? "border-red-500" : "border-gray-300"
+                          }`}
+                          aria-invalid={!!ce.email}
+                        />
+                        {ce.email && <p className="mt-1 text-sm text-red-600">{ce.email}</p>}
+                      </div>
+
+                      <div>
+                        <input
+                          type="tel"
+                          placeholder={t("rsvp.form.companions.phonePlaceholder")}
+                          value={companion.phone}
+                          onChange={(e) => updateCompanion(companion.id, { phone: e.target.value })}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+                            ce.phone ? "border-red-500" : "border-gray-300"
+                          }`}
+                          aria-invalid={!!ce.phone}
+                        />
+                        {ce.phone && <p className="mt-1 text-sm text-red-600">{ce.phone}</p>}
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <h5 className="text-sm font-medium text-gray-700 mb-3">{t("rsvp.form.steps.health")}</h5>
+                        <AllergyInput
+                          person={companion}
+                          onUpdate={(allergies) => updateCompanion(companion.id, { allergies })}
+                        />
+                      </div>
                     </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        type="text"
-                        required
-                        placeholder={`${t("rsvp.form.companions.lastnamePlaceholder")} *`}
-                        value={companion.lastName}
-                        onChange={(e) => updateCompanion(companion.id, { lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0"
-                      />
-                      <input
-                        type="text"
-                        required
-                        placeholder={`${t("rsvp.form.companions.firstnamePlaceholder")} *`}
-                        value={companion.firstName}
-                        onChange={(e) => updateCompanion(companion.id, { firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0"
-                      />
-                    </div>
-
-                    {/* 生年月日（日本式） */}
-                    <BirthdateJP
-                      label={t("rsvp.form.birthdate")}
-                      value={companion.birthDate}
-                      onChange={(iso) => updateCompanion(companion.id, { birthDate: iso })}
-                      required
-                    />
-
-                    <input
-                      type="email"
-                      placeholder={t("rsvp.form.companions.emailPlaceholder")}
-                      value={companion.email}
-                      onChange={(e) => updateCompanion(companion.id, { email: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-
-                    <input
-                      type="tel"
-                      placeholder={t("rsvp.form.companions.phonePlaceholder")}
-                      value={companion.phone}
-                      onChange={(e) => updateCompanion(companion.id, { phone: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-
-                    <div className="border-t pt-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">{t("rsvp.form.steps.health")}</h5>
-                      <AllergyInput
-                        person={companion}
-                        onUpdate={(allergies) => updateCompanion(companion.id, { allergies })}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -888,31 +1015,38 @@ export default function RsvpForm({ token }: { token: string }) {
             <button
               type="button"
               onClick={async () => {
-                // Step1: 代表者の重複チェック（サーバー）
+                // Step1: 代表者の形式 & 重複チェック
                 if (step === 1) {
+                  // presence は既存 canGoNextStep1 で担保、形式はここで検証
                   if (!canGoNextStep1) {
-                    alert(t("rsvp.form.validation.selectAttendance"));
+                    // 入力が足りない場合は attendance のみメッセージを出す（他は必須属性でUX担保）
+                    setErrors((e) => ({
+                      ...e,
+                      mainGuest: {
+                        ...e.mainGuest,
+                        attendance: formData.attendance ? undefined : t("rsvp.form.validation.selectAttendance"),
+                      },
+                    }));
                     return;
                   }
+                  if (!validateStep1()) return;
+
                   setDupError(null);
                   const fd = new FormData();
                   fd.set("lastName", formData.mainGuest.lastName.trim());
                   fd.set("firstName", formData.mainGuest.firstName.trim());
                   fd.set("birthDate", formData.mainGuest.birthDate);
                   startTransition(() => {
-                    dupFormAction(fd); 
-                  })
+                    dupFormAction(fd);
+                  });
                   return;
                 }
 
-                // Step3: 同伴者の重複チェック（サーバーを直接呼ぶ）
+                // Step3: 同伴者の形式チェック（任意フィールドのみ）。必須も赤字化。
                 if (step === 3) {
-                  if (!companionsOk) {
-                    alert(t("rsvp.form.validation.fillCompanions"));
-                    return;
-                  }
-                  setDupError(null);
+                  if (!validateStep3()) return;
 
+                  setDupError(null);
                   const results = await Promise.all(
                     formData.companions.map((c) =>
                       checkDuplicateDirect({
@@ -924,7 +1058,13 @@ export default function RsvpForm({ token }: { token: string }) {
                   );
 
                   const dups: string[] = results
-                    .map((r, idx) => (r?.ok === false ? `${formData.companions[idx].lastName} ${formData.companions[idx].firstName}（${isoToSlash(formData.companions[idx].birthDate)}）` : null))
+                    .map((r, idx) =>
+                      r?.ok === false
+                        ? `${formData.companions[idx].lastName} ${formData.companions[idx].firstName}（${isoToSlash(
+                            formData.companions[idx].birthDate
+                          )}）`
+                        : null
+                    )
                     .filter((s): s is string => !!s);
 
                   if (dups.length) {
@@ -935,7 +1075,8 @@ export default function RsvpForm({ token }: { token: string }) {
 
                 nextStep();
               }}
-              disabled={dupPending || (step === 1 && !canGoNextStep1) || (step === 3 && !companionsOk)}
+              // dupPending 中だけ無効化（presence/format は上の関数で制御）
+              disabled={dupPending}
               className="ml-auto px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:bg-gray-300 transition-colors"
             >
               {dupPending ? t("rsvp.form.navigation.checking") : t("rsvp.form.navigation.next")}
