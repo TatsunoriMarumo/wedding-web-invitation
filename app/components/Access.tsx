@@ -177,15 +177,6 @@ export default function Access() {
               <p>{t("access.eventCard.reception")}</p>
               <p>{t("access.eventCard.contact")}</p>
             </div>
-
-            <div className="flex space-x-2 mt-4">
-              <button className="flex-1 bg-pink-500 text-white py-2 px-4 rounded-lg text-sm font-medium hover:bg-pink-600 transition-colors">
-                {t("access.eventCard.addToCalendar")}
-              </button>
-              <button className="flex-1 border border-pink-500 text-pink-500 py-2 px-4 rounded-lg text-sm font-medium hover:bg-pink-50 transition-colors">
-                {t("access.eventCard.share")}
-              </button>
-            </div>
           </div>
         </div>
       </div>
