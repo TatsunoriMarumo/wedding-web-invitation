@@ -81,11 +81,13 @@ function BirthdateJP({
   value,
   onChange,
   required,
+  error,
 }: {
   label: string;
   value: string; // YYYY-MM-DD
   onChange: (iso: string) => void;
   required?: boolean;
+  error?: string;
 }) {
   const today = useMemo(() => {
     const t = new Date();
@@ -188,6 +190,11 @@ function BirthdateJP({
     emitIfComplete(next);
   };
 
+  const selCls = (hasErr: boolean) =>
+    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
+      hasErr ? "border-red-500" : "border-gray-300"
+    }`;
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -199,7 +206,7 @@ function BirthdateJP({
           required={required}
           value={local.y === "" ? "" : local.y}
           onChange={(e) => onYearChange(e.target.value)}
-          className="w-28 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          className={`w-28 ${selCls(!!error)}`}
         >
           <option value="">年</option>
           {years.map((y) => (
@@ -214,7 +221,7 @@ function BirthdateJP({
           required={required}
           value={local.m === "" ? "" : local.m}
           onChange={(e) => onMonthChange(e.target.value)}
-          className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          className={`w-24 ${selCls(!!error)}`}
           disabled={local.y === ""}
         >
           <option value="">月</option>
@@ -230,7 +237,7 @@ function BirthdateJP({
           required={required}
           value={local.d === "" ? "" : local.d}
           onChange={(e) => onDayChange(e.target.value)}
-          className="w-24 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          className={`w-24 ${selCls(!!error)}`}
           disabled={local.y === "" || local.m === ""}
         >
           <option value="">日</option>
@@ -242,6 +249,7 @@ function BirthdateJP({
         </select>
       </div>
       <p className="mt-2 text-xs text-gray-500">形式：YYYY/MM/DD（例：1990/06/15）</p>
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
     </div>
   );
 }
@@ -437,8 +445,24 @@ function AllergyInput({
  * =========================== */
 
 type FieldErrors = {
-  mainGuest: { email?: string; phone?: string; attendance?: string };
-  companions: Record<string, { email?: string; phone?: string; requiredName?: boolean; requiredBirth?: boolean }>;
+  mainGuest: {
+    lastName?: string;
+    firstName?: string;
+    birthDate?: string;
+    email?: string;
+    phone?: string;
+    attendance?: string;
+  };
+  companions: Record<
+    string,
+    {
+      email?: string;
+      phone?: string;
+      lastName?: string;   // ← 追加：個別エラー
+      firstName?: string;  // ← 追加：個別エラー
+      birthDate?: string;  // ← 追加：個別エラー
+    }
+  >;
 };
 
 export default function RsvpForm({ token }: { token: string }) {
@@ -546,50 +570,70 @@ export default function RsvpForm({ token }: { token: string }) {
   const updateCompanion = (id: string, updates: Partial<Person>) =>
     setFormData((p) => ({ ...p, companions: p.companions.map((c) => (c.id === id ? { ...c, ...updates } : c)) }));
 
-  // 進行条件（※ presence 用。形式チェックは「次へ」クリック時に実施）
-  const canGoNextStep1 =
-    !!formData.mainGuest.lastName &&
-    !!formData.mainGuest.firstName &&
-    !!formData.mainGuest.email &&
-    !!formData.mainGuest.phone &&
-    !!formData.mainGuest.birthDate &&
-    !!formData.attendance;
-
-  const companionsOk = formData.companions.every((c) => !!c.lastName && !!c.firstName && !!c.birthDate);
-
   const currentStepNumber = step;
 
-  // Step1: 形式チェック
+  // Step1: 必須 & 形式チェック（姓・名・生年月日・メール・電話・出欠）
   const validateStep1 = (): boolean => {
     const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
+
+    // 必須: 姓・名
+    if (!formData.mainGuest.lastName.trim()) {
+      nextErrors.mainGuest.lastName = t("rsvp.form.validation.requiredLastName");
+    }
+    if (!formData.mainGuest.firstName.trim()) {
+      nextErrors.mainGuest.firstName = t("rsvp.form.validation.requiredFirstName");
+    }
+
+    // 必須: 生年月日（BirthdateJP は未完成/不正なら空文字を返す仕様）
+    if (!formData.mainGuest.birthDate) {
+      nextErrors.mainGuest.birthDate = t("rsvp.form.validation.requiredBirthdate");
+    }
 
     // 出欠
     if (!formData.attendance) {
       nextErrors.mainGuest.attendance = t("rsvp.form.validation.selectAttendance");
     }
 
-    // Email
+    // Email 形式
     const e1 = EmailSchema.safeParse(formData.mainGuest.email.trim());
     if (!e1.success) nextErrors.mainGuest.email = e1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
 
-    // Phone
+    // Phone 形式
     const p1 = PhoneSchema.safeParse(formData.mainGuest.phone.trim());
     if (!p1.success) nextErrors.mainGuest.phone = p1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidPhone");
 
     setErrors(nextErrors);
-    return !nextErrors.mainGuest.email && !nextErrors.mainGuest.phone && !nextErrors.mainGuest.attendance;
+
+    // いずれのエラーも無いか
+    return (
+      !nextErrors.mainGuest.lastName &&
+      !nextErrors.mainGuest.firstName &&
+      !nextErrors.mainGuest.birthDate &&
+      !nextErrors.mainGuest.email &&
+      !nextErrors.mainGuest.phone &&
+      !nextErrors.mainGuest.attendance
+    );
   };
 
-  // Step3: 同伴者のメール/電話だけ形式チェック（任意入力）
+  // Step3: 同伴者のメール/電話だけ形式チェック（任意入力）+ 必須（姓・名・誕生日 ※個別キーで表示）
   const validateStep3 = (): boolean => {
     const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
 
-    // 必須（姓・名・誕生日）未入力の赤字も付ける
     formData.companions.forEach((c) => {
-      const ce: { email?: string; phone?: string; requiredName?: boolean; requiredBirth?: boolean } = {};
-      if (!c.lastName || !c.firstName) ce.requiredName = true;
-      if (!c.birthDate) ce.requiredBirth = true;
+      const ce: {
+        email?: string;
+        phone?: string;
+        lastName?: string;
+        firstName?: string;
+        birthDate?: string;
+      } = {};
 
+      // 必須（個別キーを使用）
+      if (!c.lastName?.trim()) ce.lastName = t("rsvp.form.validation.requiredLastName");
+      if (!c.firstName?.trim()) ce.firstName = t("rsvp.form.validation.requiredFirstName");
+      if (!c.birthDate) ce.birthDate = t("rsvp.form.validation.requiredBirthdate");
+
+      // 任意の形式チェック
       if (c.email?.trim()) {
         const r = EmailSchema.safeParse(c.email.trim());
         if (!r.success) ce.email = r.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
@@ -598,14 +642,19 @@ export default function RsvpForm({ token }: { token: string }) {
         const r = PhoneSchema.safeParse(c.phone.trim());
         if (!r.success) ce.phone = r.error.issues[0]?.message ?? t("rsvp.form.validation.invalidPhone");
       }
+
       if (Object.keys(ce).length > 0) nextErrors.companions[c.id] = ce;
     });
 
     setErrors(nextErrors);
-    // 形式エラーがない & 必須OK
+
+    // 形式エラーなし & 必須エラーなし
     const noFormatError = Object.values(nextErrors.companions).every((v) => !v.email && !v.phone);
-    const requiredOK = formData.companions.every((c) => !!c.lastName && !!c.firstName && !!c.birthDate);
-    return noFormatError && requiredOK;
+    const noRequiredError = Object.values(nextErrors.companions).every(
+      (v) => !v.lastName && !v.firstName && !v.birthDate
+    );
+
+    return noFormatError && noRequiredError;
   };
 
   return (
@@ -621,7 +670,9 @@ export default function RsvpForm({ token }: { token: string }) {
             >
               {i + 1}
             </div>
-            {i < totalSteps - 1 && <div className={`w-12 h-1 mx-2 ${i + 1 < currentStepNumber ? "bg-pink-500" : "bg-gray-200"}`} />}
+            {i < totalSteps - 1 && (
+              <div className={`w-12 h-1 mx-2 ${i + 1 < currentStepNumber ? "bg-pink-500" : "bg-gray-200"}`} />
+            )}
           </div>
         ))}
       </div>
@@ -655,8 +706,14 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.lastName}
                   onChange={(e) => updateMainGuest({ lastName: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
+                    errors.mainGuest.lastName ? "border-red-500" : "border-gray-300"
+                  }`}
+                  aria-invalid={!!errors.mainGuest.lastName}
                 />
+                {errors.mainGuest.lastName && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.lastName}</p>
+                )}
               </div>
 
               <div>
@@ -668,8 +725,14 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.firstName}
                   onChange={(e) => updateMainGuest({ firstName: e.target.value })}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
+                    errors.mainGuest.firstName ? "border-red-500" : "border-gray-300"
+                  }`}
+                  aria-invalid={!!errors.mainGuest.firstName}
                 />
+                {errors.mainGuest.firstName && (
+                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.firstName}</p>
+                )}
               </div>
             </div>
 
@@ -679,6 +742,7 @@ export default function RsvpForm({ token }: { token: string }) {
               value={formData.mainGuest.birthDate}
               onChange={(iso) => updateMainGuest({ birthDate: iso })}
               required
+              error={errors.mainGuest.birthDate}
             />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -734,7 +798,9 @@ export default function RsvpForm({ token }: { token: string }) {
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
                   className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "attend" ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
+                    formData.attendance === "attend"
+                      ? "border-green-500 bg-green-50 text-green-700"
+                      : "border-gray-200 hover:border-green-300"
                   }`}
                 >
                   ✅ {t("rsvp.form.attend")}
@@ -747,7 +813,9 @@ export default function RsvpForm({ token }: { token: string }) {
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
                   className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "decline" ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
+                    formData.attendance === "decline"
+                      ? "border-red-500 bg-red-50 text-red-700"
+                      : "border-gray-200 hover:border-red-300"
                   }`}
                 >
                   ❌ {t("rsvp.form.decline")}
@@ -826,12 +894,11 @@ export default function RsvpForm({ token }: { token: string }) {
                             value={companion.lastName}
                             onChange={(e) => updateCompanion(companion.id, { lastName: e.target.value })}
                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
-                              ce.requiredName ? "border-red-500" : "border-gray-300"
+                              ce.lastName ? "border-red-500" : "border-gray-300"
                             }`}
+                            aria-invalid={!!ce.lastName}
                           />
-                          {ce.requiredName && (
-                            <p className="mt-1 text-sm text-red-600">{t("rsvp.form.validation.fillCompanions")}</p>
-                          )}
+                          {ce.lastName && <p className="mt-1 text-sm text-red-600">{ce.lastName}</p>}
                         </div>
                         <div>
                           <input
@@ -841,23 +908,23 @@ export default function RsvpForm({ token }: { token: string }) {
                             value={companion.firstName}
                             onChange={(e) => updateCompanion(companion.id, { firstName: e.target.value })}
                             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
-                              ce.requiredName ? "border-red-500" : "border-gray-300"
+                              ce.firstName ? "border-red-500" : "border-gray-300"
                             }`}
+                            aria-invalid={!!ce.firstName}
                           />
+                          {ce.firstName && <p className="mt-1 text-sm text-red-600">{ce.firstName}</p>}
                         </div>
                       </div>
 
                       {/* 生年月日（日本式） */}
-                      <div className={ce.requiredBirth ? "border-red-500 rounded-lg" : ""}>
+                      <div className={ce.birthDate ? "border-red-500 rounded-lg" : ""}>
                         <BirthdateJP
                           label={t("rsvp.form.birthdate")}
                           value={companion.birthDate}
                           onChange={(iso) => updateCompanion(companion.id, { birthDate: iso })}
                           required
+                          error={ce.birthDate}
                         />
-                        {ce.requiredBirth && (
-                          <p className="mt-1 text-sm text-red-600">{t("rsvp.form.validation.fillCompanions")}</p>
-                        )}
                       </div>
 
                       <div>
@@ -1015,20 +1082,8 @@ export default function RsvpForm({ token }: { token: string }) {
             <button
               type="button"
               onClick={async () => {
-                // Step1: 代表者の形式 & 重複チェック
+                // Step1: 代表者の必須 & 形式チェック → OKなら重複チェック
                 if (step === 1) {
-                  // presence は既存 canGoNextStep1 で担保、形式はここで検証
-                  if (!canGoNextStep1) {
-                    // 入力が足りない場合は attendance のみメッセージを出す（他は必須属性でUX担保）
-                    setErrors((e) => ({
-                      ...e,
-                      mainGuest: {
-                        ...e.mainGuest,
-                        attendance: formData.attendance ? undefined : t("rsvp.form.validation.selectAttendance"),
-                      },
-                    }));
-                    return;
-                  }
                   if (!validateStep1()) return;
 
                   setDupError(null);
@@ -1042,7 +1097,7 @@ export default function RsvpForm({ token }: { token: string }) {
                   return;
                 }
 
-                // Step3: 同伴者の形式チェック（任意フィールドのみ）。必須も赤字化。
+                // Step3: 同伴者の形式チェック（任意）+ 必須（個別キーエラー）
                 if (step === 3) {
                   if (!validateStep3()) return;
 
