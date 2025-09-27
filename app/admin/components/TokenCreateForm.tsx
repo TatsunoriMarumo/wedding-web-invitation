@@ -4,7 +4,7 @@
 import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { createInvitationToken, type TokenActionState } from "../actions"; // ここで型だけimportしてOK（型はビルド時に消える）
+import { createInvitationToken, type TokenActionState } from "../actions";
 import { useLanguage } from "@/app/providers";
 import type { InviteToken } from "@/lib/types";
 
@@ -25,15 +25,12 @@ function SubmitButton() {
 export function TokenCreateForm({
   onClose,
   onSuccess,
-  addOptimisticToken,
 }: {
   onClose: () => void;
   onSuccess: (newToken: InviteToken) => void;
-  addOptimisticToken: (newToken: InviteToken) => void;
 }) {
   const { t } = useLanguage();
 
-  // ---- 状態の型を明示（第二型引数に FormData） ----
   const [state, formAction] = useActionState<TokenActionState, FormData>(
     createInvitationToken,
     { message: null, token: null }
@@ -41,12 +38,11 @@ export function TokenCreateForm({
 
   useEffect(() => {
     if (state?.message === "success" && state.token) {
-      // サーバが返した InviteToken をそのまま使う（stringではない）
-      addOptimisticToken(state.token);
+      // 楽観更新はせず、実データだけを反映して閉じる
       onSuccess(state.token);
       onClose();
     }
-  }, [state, onSuccess, onClose, addOptimisticToken]);
+  }, [state, onSuccess, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">

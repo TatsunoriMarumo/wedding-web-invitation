@@ -1,7 +1,7 @@
 // app/admin/components/AdminDashboard.tsx
 "use client";
 
-import { useState, useOptimistic } from "react";
+import { useState, useOptimistic, startTransition } from "react";
 import type { Guest, InviteToken } from "@/lib/types";
 import { useLanguage } from "@/app/providers";
 import { StatsCards } from "./StatsCards";
@@ -35,7 +35,6 @@ const formatBirthdate = (bd: BirthdateInput): string => {
   if (bd instanceof Date) {
     return bd.toLocaleDateString("ja-JP");
   }
-  // ここに来ることはほぼ無いが、安全側で空文字
   return "";
 };
 
@@ -45,7 +44,6 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const { t } = useLanguage();
   const [tokens, setTokens] = useState(initialTokens);
-  // setGuests は未使用なのでタプルの 2 要素目を受け取らない
   const [guests] = useState(initialGuests);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
@@ -65,16 +63,17 @@ export function AdminDashboard({
   );
 
   const handleSuccess = (newToken: InviteToken) => {
+    // 作成は成功時に本物を追加（= 楽観更新はしない）
     setTokens((prev) => [newToken, ...prev]);
   };
 
   const handleTokenDeleted = (tokenId: number) => {
-    addOptimisticToken({ type: "delete", tokenId });
+    // useOptimistic の setter は Transition 内で呼ぶ
+    startTransition(() => addOptimisticToken({ type: "delete", tokenId }));
     setTokens((prev) => prev.filter((t) => t.id !== tokenId));
   };
 
   const exportToExcel = () => {
-    // CSV に生年月日列を追加（any 不使用）
     const csvContent = [
       ["姓", "名", "メールアドレス", "電話番号", "出欠", "アレルギー", "生年月日", "登録日時"],
       ...guests.map((guest) => [
@@ -132,7 +131,6 @@ export function AdminDashboard({
         <TokenCreateForm
           onClose={() => setIsCreateDialogOpen(false)}
           onSuccess={handleSuccess}
-          addOptimisticToken={(token: InviteToken) => addOptimisticToken({ type: "add", token })}
         />
       )}
     </>
