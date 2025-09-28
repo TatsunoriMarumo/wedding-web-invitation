@@ -138,3 +138,129 @@ export async function deleteInvitationToken(tokenId: number): Promise<{ success:
     };
   }
 }
+
+const PhoneSchema = z
+  .string()
+  .trim()
+  .refine((v) => /^\+?[0-9\s\-()]+$/.test(v), "invalid phone")
+  .refine((v) => {
+    const digits = v.replace(/\D/g, "");
+    return digits.length >= 8 && digits.length <= 15;
+  }, "invalid phone");
+
+const GuestUpdateSchema = z.object({
+  id: z.number(),
+  lastName: z.string().trim().min(1),
+  firstName: z.string().trim().min(1),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  email: z.string().trim().email().nullable().optional(),
+  phone: z.string().trim().nullable().optional(),
+  attendance: z.enum(["ATTEND", "DECLINE"]),
+  dogAllergy: z.boolean(),
+  foodAllergies: z.array(z.string().trim().min(1)).max(50),
+});
+
+function toNullIfEmpty(v: unknown) {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s.length ? s : null;
+}
+
+export type UpdateGuestResult =
+  | { ok: true; updated: any }
+  | { ok: false; error: string };
+
+export async function updateGuestAction(fd: FormData): Promise<UpdateGuestResult> {
+  try {
+    const raw = fd.get("payload");
+    if (!raw || typeof raw !== "string") {
+      return { ok: false, error: "no payload" };
+    }
+    const parsed = GuestUpdateSchema.parse(JSON.parse(raw));
+
+    const email = toNullIfEmpty(parsed.email);
+    const phoneRaw = toNullIfEmpty(parsed.phone);
+    if (phoneRaw) {
+      // phone 形式チェック（任意だが入っていれば検証）
+      PhoneSchema.parse(phoneRaw);
+    }
+
+    // アレルゲンのIDを確定
+    const allergenIds: number[] = [];
+
+    if (parsed.dogAllergy) {
+      const dog = await prisma.allergen.findFirst({
+        where: { category: "DOG" },
+        select: { id: true },
+      });
+      if (dog) {
+        allergenIds.push(dog.id);
+      } else {
+        const created = await prisma.allergen.create({
+          data: { category: "DOG", name: "DOG" },
+          select: { id: true },
+        });
+        allergenIds.push(created.id);
+      }
+    }
+
+    // 食品アレルギー（重複除去）
+    const uniqueFoods = Array.from(new Set(parsed.foodAllergies.map((s) => s.trim()).filter(Boolean)));
+    if (uniqueFoods.length) {
+      const foods = await Promise.all(
+        uniqueFoods.map(async (name) => {
+          const found = await prisma.allergen.findFirst({
+            where: { category: "FOOD", name },
+            select: { id: true },
+          });
+          if (found) return found.id;
+          const created = await prisma.allergen.create({
+            data: { category: "FOOD", name },
+            select: { id: true },
+          });
+          return created.id;
+        })
+      );
+      allergenIds.push(...foods);
+    }
+
+    // まとめて更新
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.guest.update({
+        where: { id: parsed.id },
+        data: {
+          lastName: parsed.lastName,
+          firstName: parsed.firstName,
+          birthDate: new Date(parsed.birthDate),
+          email,
+          phone: phoneRaw,
+          attendance: parsed.attendance,
+        },
+      });
+
+      // 中間テーブルを張り替え
+      await tx.guestAllergy.deleteMany({ where: { guestId: parsed.id } });
+      if (allergenIds.length) {
+        await tx.guestAllergy.createMany({
+          data: allergenIds.map((aid) => ({ guestId: parsed.id, allergenId: aid })),
+          skipDuplicates: true,
+        });
+      }
+
+      // 最新を取得（画面反映用）
+      return tx.guest.findUnique({
+        where: { id: parsed.id },
+        include: {
+          allergies: { include: { allergen: true } },
+        },
+      });
+    });
+
+    revalidatePath("/");
+    revalidatePath("/admin");
+
+    return { ok: true, updated };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "update failed" };
+  }
+}

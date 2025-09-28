@@ -1,18 +1,15 @@
 // app/admin/components/GuestTable.tsx
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Pencil } from "lucide-react";
 import { useLanguage } from "@/app/providers";
 import { Guest } from "@/lib/types";
-
-interface GuestTableProps {
-  guests: Guest[];
-  onExportClick: () => void;
-}
+import GuestEditDialog from "./GuestEditDialog";
 
 /** birthDate の受け取りを限定して any を排除 */
 type BirthdateInput = string | number | Date | null | undefined;
@@ -25,7 +22,6 @@ const hasBirthDate = (v: unknown): v is HasBirthDate =>
 const formatBirthdate = (bd: BirthdateInput): string => {
   if (!bd) return "";
   if (typeof bd === "string") {
-    // "YYYY-MM-DD" を "YYYY/MM/DD" に整形（それ以外は Date に委譲）
     const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
     return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
   }
@@ -38,8 +34,15 @@ const formatBirthdate = (bd: BirthdateInput): string => {
   return "";
 };
 
-export function GuestTable({ guests, onExportClick }: GuestTableProps) {
+interface GuestTableProps {
+  guests: Guest[];
+  onExportClick: () => void;
+  onGuestUpdated: (g: Guest) => void;
+}
+
+export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTableProps) {
   const { t } = useLanguage();
+  const [editing, setEditing] = useState<Guest | null>(null);
 
   return (
     <Card>
@@ -66,6 +69,7 @@ export function GuestTable({ guests, onExportClick }: GuestTableProps) {
                 <TableHead>{t("admin.guests.table.allergies")}</TableHead>
                 <TableHead>{t("admin.guests.table.birthdate")}</TableHead>
                 <TableHead className="whitespace-nowrap">{t("admin.guests.table.registeredAt")}</TableHead>
+                <TableHead className="whitespace-nowrap">{t("admin.guests.table.actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -104,12 +108,30 @@ export function GuestTable({ guests, onExportClick }: GuestTableProps) {
                   <TableCell className="whitespace-nowrap">
                     {new Date(guest.createdAt).toLocaleString("ja-JP")}
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <Button variant="outline" size="sm" onClick={() => setEditing(guest)}>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      {t("admin.guests.editButton")}
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       </CardContent>
+
+      {editing && (
+        <GuestEditDialog
+          guest={editing}
+          open={!!editing}
+          onClose={() => setEditing(null)}
+          onUpdated={(g) => {
+            onGuestUpdated(g);
+            setEditing(null);
+          }}
+        />
+      )}
     </Card>
   );
 }

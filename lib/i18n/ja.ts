@@ -372,6 +372,7 @@ export const ja = {
       title: "参加者一覧",
       description: "出欠登録済みのゲスト情報を確認できます",
       exportButton: "エクセル出力",
+      editButton: "編集",
       table: {
         name: "名前",
         contact: "連絡先",
@@ -379,10 +380,17 @@ export const ja = {
         allergies: "アレルギー",
         birthdate: "生年月日",
         registeredAt: "登録日時",
+        actions: "操作",
         attend: "出席",
         decline: "欠席",
         none: "なし",
         notRegistered: "未登録",
+      },
+      editDialog: {
+        title: "ゲスト情報を編集",
+        save: "保存",
+        cancel: "キャンセル",
+        success: "更新しました",
       },
     },
     common: {
