@@ -43,6 +43,25 @@ type SubmitState = { success: boolean; error?: string };
  * Utilities
  * =========================== */
 
+function FieldErrorLine({
+  message,
+  className = "",
+}: {
+  message?: string | null;
+  className?: string;
+}) {
+  return (
+    <p
+      aria-live="polite"
+      aria-hidden={!message}
+      className={`text-sm h-5 leading-5 ${message ? "text-red-600" : "text-transparent"
+        } ${className}`}
+    >
+      {message || "." /* 高さ確保のダミー */}
+    </p>
+  );
+}
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const ymdToISO = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
 const isoToSlash = (iso: string) => (iso ? iso.replaceAll("-", "/") : "");
@@ -191,8 +210,7 @@ function BirthdateJP({
   };
 
   const selCls = (hasErr: boolean) =>
-    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
-      hasErr ? "border-red-500" : "border-gray-300"
+    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${hasErr ? "border-red-500" : "border-gray-300"
     }`;
 
   return (
@@ -249,7 +267,7 @@ function BirthdateJP({
         </select>
       </div>
       <p className="mt-2 text-xs text-gray-500">形式：YYYY/MM/DD（例：1990/06/15）</p>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      <FieldErrorLine message={error} />
     </div>
   );
 }
@@ -342,9 +360,8 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(false)}
             aria-pressed={!hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${
-              !hasDogAllergy ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
-            }`}
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${!hasDogAllergy ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
+              }`}
           >
             {t("rsvp.form.health.no")}
           </button>
@@ -352,9 +369,8 @@ function AllergyInput({
             type="button"
             onClick={() => setDogAllergy(true)}
             aria-pressed={hasDogAllergy}
-            className={`p-3 rounded-lg border-2 transition-all text-sm ${
-              hasDogAllergy ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
-            }`}
+            className={`p-3 rounded-lg border-2 transition-all text-sm ${hasDogAllergy ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
+              }`}
           >
             {t("rsvp.form.health.yes")}
           </button>
@@ -664,9 +680,8 @@ export default function RsvpForm({ token }: { token: string }) {
         {Array.from({ length: totalSteps }, (_, i) => (
           <div key={i} className="flex items-center">
             <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
-              }`}
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${i + 1 <= currentStepNumber ? "bg-pink-500 text-white" : "bg-gray-200 text-gray-500"
+                }`}
             >
               {i + 1}
             </div>
@@ -706,14 +721,11 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.lastName}
                   onChange={(e) => updateMainGuest({ lastName: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    errors.mainGuest.lastName ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${errors.mainGuest.lastName ? "border-red-500" : "border-gray-300"
+                    }`}
                   aria-invalid={!!errors.mainGuest.lastName}
                 />
-                {errors.mainGuest.lastName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.lastName}</p>
-                )}
+                <FieldErrorLine message={errors.mainGuest.lastName} />
               </div>
 
               <div>
@@ -725,14 +737,11 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.firstName}
                   onChange={(e) => updateMainGuest({ firstName: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    errors.mainGuest.firstName ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${errors.mainGuest.firstName ? "border-red-500" : "border-gray-300"
+                    }`}
                   aria-invalid={!!errors.mainGuest.firstName}
                 />
-                {errors.mainGuest.firstName && (
-                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.firstName}</p>
-                )}
+                <FieldErrorLine message={errors.mainGuest.firstName} />
               </div>
             </div>
 
@@ -755,14 +764,11 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.email}
                   onChange={(e) => updateMainGuest({ email: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    errors.mainGuest.email ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${errors.mainGuest.email ? "border-red-500" : "border-gray-300"
+                    }`}
                   aria-invalid={!!errors.mainGuest.email}
                 />
-                {errors.mainGuest.email && (
-                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.email}</p>
-                )}
+                <FieldErrorLine message={errors.mainGuest.email} />
               </div>
 
               <div>
@@ -774,14 +780,11 @@ export default function RsvpForm({ token }: { token: string }) {
                   required
                   value={formData.mainGuest.phone}
                   onChange={(e) => updateMainGuest({ phone: e.target.value })}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    errors.mainGuest.phone ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${errors.mainGuest.phone ? "border-red-500" : "border-gray-300"
+                    }`}
                   aria-invalid={!!errors.mainGuest.phone}
                 />
-                {errors.mainGuest.phone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.mainGuest.phone}</p>
-                )}
+                <FieldErrorLine message={errors.mainGuest.phone} />
               </div>
             </div>
 
@@ -797,11 +800,10 @@ export default function RsvpForm({ token }: { token: string }) {
                     setFormData((p) => ({ ...p, attendance: "attend" }));
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "attend"
+                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "attend"
                       ? "border-green-500 bg-green-50 text-green-700"
                       : "border-gray-200 hover:border-green-300"
-                  }`}
+                    }`}
                 >
                   ✅ {t("rsvp.form.attend")}
                 </button>
@@ -812,18 +814,15 @@ export default function RsvpForm({ token }: { token: string }) {
                     setFormData((p) => ({ ...p, attendance: "decline" }));
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    formData.attendance === "decline"
+                  className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "decline"
                       ? "border-red-500 bg-red-50 text-red-700"
                       : "border-gray-200 hover:border-red-300"
-                  }`}
+                    }`}
                 >
                   ❌ {t("rsvp.form.decline")}
                 </button>
               </div>
-              {errors.mainGuest.attendance && (
-                <p className="mt-2 text-sm text-red-600">{errors.mainGuest.attendance}</p>
-              )}
+              <FieldErrorLine message={errors.mainGuest.attendance} />
             </div>
           </div>
         )}
@@ -893,12 +892,11 @@ export default function RsvpForm({ token }: { token: string }) {
                             placeholder={`${t("rsvp.form.companions.lastnamePlaceholder")} *`}
                             value={companion.lastName}
                             onChange={(e) => updateCompanion(companion.id, { lastName: e.target.value })}
-                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
-                              ce.lastName ? "border-red-500" : "border-gray-300"
-                            }`}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${ce.lastName ? "border-red-500" : "border-gray-300"
+                              }`}
                             aria-invalid={!!ce.lastName}
                           />
-                          {ce.lastName && <p className="mt-1 text-sm text-red-600">{ce.lastName}</p>}
+                          <FieldErrorLine message={ce.lastName} />
                         </div>
                         <div>
                           <input
@@ -907,12 +905,11 @@ export default function RsvpForm({ token }: { token: string }) {
                             placeholder={`${t("rsvp.form.companions.firstnamePlaceholder")} *`}
                             value={companion.firstName}
                             onChange={(e) => updateCompanion(companion.id, { firstName: e.target.value })}
-                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${
-                              ce.firstName ? "border-red-500" : "border-gray-300"
-                            }`}
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent min-w-0 ${ce.firstName ? "border-red-500" : "border-gray-300"
+                              }`}
                             aria-invalid={!!ce.firstName}
                           />
-                          {ce.firstName && <p className="mt-1 text-sm text-red-600">{ce.firstName}</p>}
+                          <FieldErrorLine message={ce.firstName} />
                         </div>
                       </div>
 
@@ -933,12 +930,11 @@ export default function RsvpForm({ token }: { token: string }) {
                           placeholder={t("rsvp.form.companions.emailPlaceholder")}
                           value={companion.email}
                           onChange={(e) => updateCompanion(companion.id, { email: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
-                            ce.email ? "border-red-500" : "border-gray-300"
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${ce.email ? "border-red-500" : "border-gray-300"
+                            }`}
                           aria-invalid={!!ce.email}
                         />
-                        {ce.email && <p className="mt-1 text-sm text-red-600">{ce.email}</p>}
+                        <FieldErrorLine message={ce.email} />
                       </div>
 
                       <div>
@@ -947,12 +943,11 @@ export default function RsvpForm({ token }: { token: string }) {
                           placeholder={t("rsvp.form.companions.phonePlaceholder")}
                           value={companion.phone}
                           onChange={(e) => updateCompanion(companion.id, { phone: e.target.value })}
-                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
-                            ce.phone ? "border-red-500" : "border-gray-300"
-                          }`}
+                          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${ce.phone ? "border-red-500" : "border-gray-300"
+                            }`}
                           aria-invalid={!!ce.phone}
                         />
-                        {ce.phone && <p className="mt-1 text-sm text-red-600">{ce.phone}</p>}
+                        <FieldErrorLine message={ce.phone} />
                       </div>
 
                       <div className="border-t pt-4">
@@ -1116,8 +1111,8 @@ export default function RsvpForm({ token }: { token: string }) {
                     .map((r, idx) =>
                       r?.ok === false
                         ? `${formData.companions[idx].lastName} ${formData.companions[idx].firstName}（${isoToSlash(
-                            formData.companions[idx].birthDate
-                          )}）`
+                          formData.companions[idx].birthDate
+                        )}）`
                         : null
                     )
                     .filter((s): s is string => !!s);
