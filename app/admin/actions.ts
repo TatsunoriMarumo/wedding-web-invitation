@@ -5,13 +5,17 @@ import { z } from "zod";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import prisma from "@/lib/prisma";
 import type { Guest, InviteToken } from "@/lib/types";
+import { requireAdmin } from "@/lib/requireAdmin";
+import { canonicalizeEmail } from "@/lib/email";
+import type { AdminActionState } from "./actions.shared";
+import { signOut } from "@/auth";
 
 // ---- 追加：useActionState用の固定状態型（null許容） ----
 export type TokenActionState = {
   message: string | null;
   token: InviteToken | null;
 };
-
+  
 // 既存: 管理画面データ取得
 export async function getAdminData() {
   noStore();
@@ -263,4 +267,56 @@ export async function updateGuestAction(fd: FormData): Promise<UpdateGuestResult
   } catch (e: any) {
     return { ok: false, error: e?.message ?? "update failed" };
   }
+}
+
+const EmailSchema = z.object({ email: z.string().email() });
+
+export async function addAdminEmail(
+  _prev: AdminActionState,
+  fd: FormData
+): Promise<AdminActionState> {
+  await requireAdmin();
+
+  const parsed = EmailSchema.safeParse({ email: fd.get("email") });
+  if (!parsed.success) return { error: "Invalid email." };
+
+  const email = parsed.data.email.toLowerCase();
+  const canonical = canonicalizeEmail(email);
+
+  try {
+    await prisma.admin.upsert({
+      where: { canonical },
+      update: { email },
+      create: { email, canonical },
+    });
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch {
+    return { error: "Failed to add (maybe already exists)." };
+  }
+}
+
+export async function removeAdminEmail(
+  _prev: AdminActionState,
+  fd: FormData
+): Promise<AdminActionState> {
+  await requireAdmin();
+
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  const canonical = canonicalizeEmail(email);
+
+  const total = await prisma.admin.count();
+  if (total <= 1) return { error: "At least one admin must remain." };
+
+  try {
+    await prisma.admin.delete({ where: { canonical } });
+    revalidatePath("/admin");
+    return { ok: true };
+  } catch {
+    return { error: "Not found or cannot delete." };
+  }
+}
+
+export async function signOutToSignin() {
+  await signOut({ redirectTo: "/signin" });
 }

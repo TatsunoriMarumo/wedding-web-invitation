@@ -5,6 +5,7 @@ import { AdminDashboard } from "./components/AdminDashboard";
 import { AdminPageSkeleton } from "./components/AdminPageSkeleton";
 import { ErrorBoundary } from "react-error-boundary";
 import { AdminPageHeader } from "./components/AdminPageHeader";
+import prisma from "@/lib/prisma";
 
 export default function AdminPage() {
   return (
@@ -21,23 +22,15 @@ export default function AdminPage() {
   );
 }
 
-// Async Server Component
 async function AdminDataResolver() {
   const res = await getAdminData();
 
-  // 失敗オブジェクト: { error: string }
-  if ("error" in res) {
-    throw new Error(res.error ?? "Failed to load admin data");
-  }
+  if ("error" in res) throw new Error(res.error ?? "Failed to load admin data");
 
-  // 成功オブジェクト: { tokens: InviteToken[]; guests: Guest[] }
-  // "in" でナローイング済みなので tokens/guests は確実に配列
   const { tokens, guests } = res;
+  const admins = await prisma.admin.findMany({ orderBy: { email: "asc" } });
 
   return (
-    <AdminDashboard
-      initialTokens={tokens}
-      initialGuests={guests}
-    />
+    <AdminDashboard initialTokens={tokens} initialGuests={guests} initialAdmins={admins} />
   );
 }

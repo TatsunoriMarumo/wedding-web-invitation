@@ -108,3 +108,10 @@ model GuestAllergy {
   @@id([guestId, allergenId])
   @@index([allergenId])
 }
+
+model Admin {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique          // 表示/通知用。基本は小文字で保存
+  canonical String   @unique          // 認可判定用の正規化キー
+  createdAt DateTime @default(now())
+}

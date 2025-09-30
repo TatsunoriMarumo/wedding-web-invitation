@@ -1,4 +1,3 @@
-// app/admin/components/AdminDashboard.tsx
 "use client";
 
 import { useState, useOptimistic, startTransition } from "react";
@@ -9,34 +8,22 @@ import { TokenTable } from "./TokenTable";
 import { GuestTable } from "./GuestTable";
 import { TokenCreateForm } from "./TokenCreateForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminManager from "./AdminManager";
 
 interface AdminDashboardProps {
   initialTokens: InviteToken[];
   initialGuests: Guest[];
+  initialAdmins: { id: number; email: string; canonical: string }[];
 }
 
 /** 受け取りうる型を限定して any を排除 */
 type BirthdateInput = string | number | Date | null | undefined;
-type HasBirthDate = { birthDate?: BirthdateInput };
-const hasBirthDate = (v: unknown): v is HasBirthDate =>
-  typeof v === "object" && v !== null && "birthDate" in v;
 
-const formatBirthdate = (bd: BirthdateInput): string => {
-  if (!bd) return "";
-  if (typeof bd === "string") {
-    const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
-  }
-  if (typeof bd === "number") {
-    return new Date(bd).toLocaleDateString("ja-JP");
-  }
-  if (bd instanceof Date) {
-    return bd.toLocaleDateString("ja-JP");
-  }
-  return "";
-};
-
-export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardProps) {
+export function AdminDashboard({
+  initialTokens,
+  initialGuests,
+  initialAdmins,
+}: AdminDashboardProps) {
   const { t } = useLanguage();
   const [tokens, setTokens] = useState(initialTokens);
   const [guests, setGuests] = useState(initialGuests);
@@ -68,7 +55,7 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
 
   const exportToExcel = async () => {
     if (typeof window === "undefined") return;
-    const XLSX = await import("xlsx");
+    const XLSX = await import("xlsx"); // ← 1回だけ
 
     const toDate = (d: string | Date | null | undefined) =>
       d ? (typeof d === "string" ? d.slice(0, 10) : d.toISOString().slice(0, 10)) : "";
@@ -88,33 +75,12 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
       return Number.isFinite(t) ? (t as number) : Number.POSITIVE_INFINITY;
     };
 
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d")!;
-    ctx.font = '14px "Yu Gothic", "Meiryo", "Noto Sans JP", "Segoe UI", "Calibri", sans-serif';
-
-    const measurePx = (val: unknown) => {
-      if (val === null || val === undefined) return 0;
-      const lines = String(val).split(/\r?\n/);
-      let max = 0;
-      for (const line of lines) {
-        const w = ctx.measureText(line).width;
-        if (w > max) max = w;
-      }
-      return max;
-    };
-
-    const fitColsWpx = (rows: Record<string, unknown>[], headers: string[]) =>
-      headers.map((h) => {
-        const maxPx = Math.max(measurePx(h), ...rows.map((r) => measurePx(r[h])));
-        return { wpx: Math.ceil(maxPx) + 8 };
-      });
-
     const sortedGuests = [...guests].sort((a, b) => {
       const ar = attendanceRank(a.attendance) - attendanceRank(b.attendance);
       if (ar !== 0) return ar;
       const ln = (a.lastName ?? "").localeCompare(b.lastName ?? "", "ja");
       if (ln !== 0) return ln;
-      const be = birthEpoch(a.birthDate) - birthEpoch(b.birthDate);
+      const be = birthEpoch(a.birthDate as any) - birthEpoch(b.birthDate as any);
       if (be !== 0) return be;
       const fn = (a.firstName ?? "").localeCompare(b.firstName ?? "", "ja");
       if (fn !== 0) return fn;
@@ -131,7 +97,7 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
       return {
         姓: g.lastName,
         名: g.firstName,
-        生年月日: toDate(g.birthDate),
+        生年月日: toDate(g.birthDate as any),
         出欠: jpAttendance(g.attendance),
         メールアドレス: g.email ?? "",
         電話番号: g.phone ?? "",
@@ -140,7 +106,23 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
       };
     });
 
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+    ctx.font = '14px "Yu Gothic", "Meiryo", "Noto Sans JP", "Segoe UI", "Calibri", sans-serif';
+    const measurePx = (val: unknown) => {
+      if (val === null || val === undefined) return 0;
+      const lines = String(val).split(/\r?\n/);
+      let max = 0;
+      for (const line of lines) max = Math.max(max, ctx.measureText(line).width);
+      return max;
+    };
+    const fitColsWpx = (rows: Record<string, unknown>[], headers: string[]) =>
+      headers.map((h) => ({ wpx: Math.ceil(Math.max(measurePx(h), ...rows.map((r) => measurePx(r[h])))) + 8 }));
+
     const guestsHeaders = ["姓", "名", "生年月日", "出欠", "メールアドレス", "電話番号", "犬アレルギー", "食品アレルギー"];
+
+    // ← ここに2回目の `const XLSX = await import("xlsx");` があったのを削除
+
     const guestsSheet = XLSX.utils.json_to_sheet(guestsRows, { header: guestsHeaders });
     guestsSheet["!cols"] = fitColsWpx(guestsRows, guestsHeaders);
 
@@ -153,19 +135,10 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
         allergenMap.get(label)!.add(full);
       }
     }
-
     const allergenEntries = Array.from(allergenMap.entries())
-      .map(([label, set]) => {
-        const namesArr = Array.from(set).sort((x, y) => x.localeCompare(y, "ja"));
-        return { label, namesArr, namesStr: namesArr.join("、") };
-      })
+      .map(([label, set]) => ({ label, namesArr: Array.from(set).sort((x, y) => x.localeCompare(y, "ja")) }))
       .sort((x, y) => (x.namesArr[0] ?? "").localeCompare(y.namesArr[0] ?? "", "ja"));
-
-    const allergyRows = allergenEntries.map((row) => ({
-      アレルゲン: row.label,
-      該当者: row.namesStr,
-    }));
-
+    const allergyRows = allergenEntries.map((row) => ({ アレルゲン: row.label, 該当者: row.namesArr.join("、") }));
     const allergyHeaders = ["アレルゲン", "該当者"];
     const allergySheet = XLSX.utils.json_to_sheet(allergyRows, { header: allergyHeaders });
     allergySheet["!cols"] = fitColsWpx(allergyRows, allergyHeaders);
@@ -173,7 +146,6 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, guestsSheet, "ゲスト一覧");
     XLSX.utils.book_append_sheet(wb, allergySheet, "アレルギー");
-
     const ab = XLSX.write(wb, { type: "array", bookType: "xlsx" });
     const blob = new Blob([ab], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
@@ -189,9 +161,10 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
       <StatsCards tokens={tokens} guests={guests} />
 
       <Tabs defaultValue="tokens" className="space-y-6 mt-8">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="tokens">{t("admin.tabs.tokens")}</TabsTrigger>
           <TabsTrigger value="guests">{t("admin.tabs.guests")}</TabsTrigger>
+          <TabsTrigger value="admins">{t("admin.tabs.admins")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tokens">
@@ -206,8 +179,14 @@ export function AdminDashboard({ initialTokens, initialGuests }: AdminDashboardP
           <GuestTable
             guests={guests}
             onExportClick={exportToExcel}
-            onGuestUpdated={(g) => setGuests((prev) => prev.map((x) => (x.id === g.id ? (g as Guest) : x)))}
+            onGuestUpdated={(g) =>
+              setGuests((prev) => prev.map((x) => (x.id === g.id ? (g as Guest) : x)))
+            }
           />
+        </TabsContent>
+
+        <TabsContent value="admins">
+          <AdminManager initial={initialAdmins} />
         </TabsContent>
       </Tabs>
 

@@ -1,3 +1,5 @@
+import { signOut } from "@/auth";
+
 export const ja = {
   nav: {
     intro: "ご挨拶",
@@ -339,6 +341,7 @@ export const ja = {
     tabs: {
       tokens: "招待トークン管理",
       guests: "参加者一覧",
+      admins: "管理者",
     },
     stats: {
       totalInvites: "総招待数",
@@ -393,9 +396,20 @@ export const ja = {
         success: "更新しました",
       },
     },
+    allowlist: {
+      addLabel: "管理者メールを追加",
+      listTitle: "許可されている管理者",
+      note: "Gmailはドットと+エイリアスを無視して同一判定します。",
+    },
     common: {
       cancel: "キャンセル",
       complete: "完了",
+      add: "追加",
+      added: "追加しました。",
+      remove: "削除",
+      removed: "削除しました。",
+      none: "ありません",
+      signOut: "サインアウト",
     },
   },
   thankYou: {
