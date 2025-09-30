@@ -1,25 +1,34 @@
-// app/(auth)/signin/page.tsx
+// app/signin/page.tsx  または app/(auth)/signin/page.tsx
 import { auth, signIn } from "@/auth";
 import { redirect } from "next/navigation";
+
+/** user が isAdmin:boolean を持つか安全に確認する型ガード */
+function hasAdminFlag(user: unknown): user is { isAdmin: boolean } {
+  return typeof (user as { isAdmin?: unknown } | null)?.isAdmin === "boolean";
+}
 
 export default async function SignInPage() {
   // 既にログイン済みなら /admin or /forbidden に即リダイレクト
   const session = await auth();
   if (session) {
-    const isAdmin = (session.user as any)?.isAdmin === true;
+    const isAdmin = hasAdminFlag(session.user) && session.user.isAdmin === true;
     redirect(isAdmin ? "/admin" : "/forbidden");
   }
 
   return (
-    <main className="min-h-svh grid place-items-center p-6 bg-background 
+    <main
+      className="min-h-svh grid place-items-center p-6 bg-background
       [background:radial-gradient(1200px_600px_at_50%_-200px,theme(colors.primary/0.08),transparent_70%)]
-      [background-position:center_top]">
+      [background-position:center_top]"
+    >
       <div className="w-full max-w-md bg-card text-card-foreground rounded-2xl border border-border shadow-xl p-8 animate-fade-in-up">
         {/* ヘッダー */}
         <div className="flex items-center gap-3 mb-6">
           <div>
             <h1 className="text-xl font-semibold leading-tight">Google でログイン</h1>
-            <p className="text-sm text-muted-foreground">管理画面にアクセスするには Google アカウントでサインインしてください。</p>
+            <p className="text-sm text-muted-foreground">
+              管理画面にアクセスするには Google アカウントでサインインしてください。
+            </p>
           </div>
         </div>
 

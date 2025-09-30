@@ -43,6 +43,14 @@ type SubmitState = { success: boolean; error?: string };
  * Utilities
  * =========================== */
 
+type SubmitApiResult = { success: boolean; error?: unknown };
+
+function isSubmitApiResult(v: unknown): v is SubmitApiResult {
+  return typeof v === "object" && v !== null &&
+    "success" in v &&
+    typeof (v as { success: unknown }).success === "boolean";
+}
+
 function FieldErrorLine({
   message,
   className = "",
@@ -495,9 +503,15 @@ export default function RsvpForm({ token }: { token: string }) {
   const [submitState, formAction] = useActionState<SubmitState, FormData>(
     async (_prev, fd) => {
       try {
-        const res: any = await submitRsvp(fd);
-        if (!res || res.success !== true) {
-          return { success: false, error: normalizeError(res?.error) };
+        const resUnknown: unknown = await submitRsvp(fd);
+
+        if (!isSubmitApiResult(resUnknown) || resUnknown.success !== true) {
+          return {
+            success: false,
+            error: normalizeError(
+              isSubmitApiResult(resUnknown) ? resUnknown.error : resUnknown
+            ),
+          };
         }
         return { success: true };
       } catch (err) {
@@ -801,8 +815,8 @@ export default function RsvpForm({ token }: { token: string }) {
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
                   className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "attend"
-                      ? "border-green-500 bg-green-50 text-green-700"
-                      : "border-gray-200 hover:border-green-300"
+                    ? "border-green-500 bg-green-50 text-green-700"
+                    : "border-gray-200 hover:border-green-300"
                     }`}
                 >
                   ✅ {t("rsvp.form.attend")}
@@ -815,8 +829,8 @@ export default function RsvpForm({ token }: { token: string }) {
                     setErrors((e) => ({ ...e, mainGuest: { ...e.mainGuest, attendance: undefined } }));
                   }}
                   className={`p-4 rounded-xl border-2 transition-all ${formData.attendance === "decline"
-                      ? "border-red-500 bg-red-50 text-red-700"
-                      : "border-gray-200 hover:border-red-300"
+                    ? "border-red-500 bg-red-50 text-red-700"
+                    : "border-gray-200 hover:border-red-300"
                     }`}
                 >
                   ❌ {t("rsvp.form.decline")}
