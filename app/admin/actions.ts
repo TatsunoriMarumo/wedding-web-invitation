@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import prisma from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import type { Guest, InviteToken } from "@/lib/types";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { canonicalizeEmail } from "@/lib/email";
@@ -170,8 +171,12 @@ function toNullIfEmpty(v: unknown) {
   return s.length ? s : null;
 }
 
+type GuestWithAllergies = Prisma.GuestGetPayload<{
+  include: { allergies: { include: { allergen: true } } };
+}>;
+
 export type UpdateGuestResult =
-  | { ok: true; updated: any }
+  | { ok: true; updated: GuestWithAllergies | null }
   | { ok: false; error: string };
 
 export async function updateGuestAction(fd: FormData): Promise<UpdateGuestResult> {
@@ -264,8 +269,9 @@ export async function updateGuestAction(fd: FormData): Promise<UpdateGuestResult
     revalidatePath("/admin");
 
     return { ok: true, updated };
-  } catch (e: any) {
-    return { ok: false, error: e?.message ?? "update failed" };
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "update failed";
+    return { ok: false, error: message };
   }
 }
 
