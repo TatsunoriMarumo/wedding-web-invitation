@@ -4,8 +4,7 @@ import { getAdminData } from "./actions";
 import { AdminDashboard } from "./components/AdminDashboard";
 import { AdminPageSkeleton } from "./components/AdminPageSkeleton";
 import { ErrorBoundary } from "react-error-boundary";
-import { AdminPageHeader } from "./components/AdminPageHeader";
-import prisma from "@/lib/prisma";
+import AdminPageHeader from "./components/AdminPageHeader";
 
 export default function AdminPage() {
   return (
