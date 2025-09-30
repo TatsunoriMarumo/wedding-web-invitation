@@ -85,32 +85,51 @@ const toTokenDTO = (t: {
  * Admin 初期データ取得
  * ====================== */
 
-export async function getAdminData(): Promise<{
-  tokens: InviteToken[];
-  guests: Guest[];
-  admins: { id: number; email: string; canonical: string }[];
-}> {
-  await requireAdmin();
-  noStore();
+type AdminRecord = { id: number; email: string; canonical: string };
 
-  const [rawTokens, rawGuests, rawAdmins] = await Promise.all([
-    prisma.invitationToken.findMany({ orderBy: { createdAt: "desc" } }),
-    prisma.guest.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { allergies: { include: { allergen: true } } },
-    }),
-    prisma.admin.findMany({ orderBy: { email: "asc" } }),
-  ]);
+export type AdminDataResult =
+  | {
+      ok: true;
+      tokens: InviteToken[];
+      guests: Guest[];
+      admins: AdminRecord[];
+    }
+  | {
+      ok: false;
+      error: string;
+    };
 
-  return {
-    tokens: rawTokens.map(toTokenDTO),
-    guests: rawGuests.map((g) => toGuestDTO(g as unknown as RowGuest)),
-    admins: rawAdmins.map((a) => ({
-      id: a.id,
-      email: a.email,
-      canonical: a.canonical,
-    })),
-  };
+export async function getAdminData(): Promise<AdminDataResult> {
+  try {
+    await requireAdmin();
+    noStore();
+
+    const [rawTokens, rawGuests, rawAdmins] = await Promise.all([
+      prisma.invitationToken.findMany({ orderBy: { createdAt: "desc" } }),
+      prisma.guest.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { allergies: { include: { allergen: true } } },
+      }),
+      prisma.admin.findMany({ orderBy: { email: "asc" } }),
+    ]);
+
+    return {
+      ok: true,
+      tokens: rawTokens.map(toTokenDTO),
+      guests: rawGuests.map((g) => toGuestDTO(g as unknown as RowGuest)),
+      admins: rawAdmins.map((a) => ({
+        id: a.id,
+        email: a.email,
+        canonical: a.canonical,
+      })),
+    };
+  } catch (e: unknown) {
+    const msg =
+      e instanceof Error && e.message?.trim()
+        ? e.message
+        : "Failed to load admin data";
+    return { ok: false, error: msg };
+  }
 }
 
 /* ==========================

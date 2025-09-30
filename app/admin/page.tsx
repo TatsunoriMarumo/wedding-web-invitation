@@ -25,12 +25,15 @@ export default function AdminPage() {
 async function AdminDataResolver() {
   const res = await getAdminData();
 
-  if ("error" in res) throw new Error(res.error ?? "Failed to load admin data");
+  if (!res.ok) throw new Error(res.error);
 
-  const { tokens, guests } = res;
-  const admins = await prisma.admin.findMany({ orderBy: { email: "asc" } });
+  const { tokens, guests, admins } = res;
 
   return (
-    <AdminDashboard initialTokens={tokens} initialGuests={guests} initialAdmins={admins} />
+    <AdminDashboard
+      initialTokens={tokens}
+      initialGuests={guests}
+      initialAdmins={admins}
+    />
   );
 }
