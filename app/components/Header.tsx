@@ -115,16 +115,6 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
             <div className="md:hidden absolute left-1/2 transform -translate-x-1/2">
               <h1 className="text-lg font-semibold text-gray-800">Wedding</h1>
             </div>
-
-            {/* 右側 CTA */}
-            <div className="flex items-center">
-              <button
-                onClick={() => scrollToSection("rsvp")}
-                className="hidden md:block bg-orange-400 hover:bg-orange-500 text-white px-6 py-2 rounded-full font-medium transition-all duration-200 hover:shadow-lg hover:scale-105"
-              >
-                {t("cta.rsvp")}
-              </button>
-            </div>
           </div>
         </div>
       </header>
@@ -161,12 +151,6 @@ const Header = forwardRef<HTMLElement, HeaderProps>(({ headerHeight }, ref) => {
                   {t(section.key)}
                 </button>
               ))}
-              <button
-                onClick={() => scrollToSection("rsvp")}
-                className="w-full bg-orange-400 hover:bg-orange-500 text-white px-4 py-3 rounded-lg font-medium transition-all duration-200 mt-6"
-              >
-                {t("cta.rsvp")}
-              </button>
             </nav>
           </div>
         </div>

@@ -4,12 +4,17 @@
 import EmptyState from "./EmptyState";
 import { useLanguage } from "../providers";
 
-export default function RsvpInvalidCard({ variant }: { variant: "missing" | "notFound" }) {
+export default function RsvpInvalidCard({
+  variant,
+  supportEmail,
+}: {
+  variant: "missing" | "notFound";
+  supportEmail: string;
+}) {
   const { t } = useLanguage();
   const title =
     variant === "missing" ? t("rsvp.error.missingTitle") : t("rsvp.error.title");
-  const description =
-    variant === "missing" ? "" : t("rsvp.error.description");
+  const description = variant === "missing" ? "" : t("rsvp.error.description");
 
   return (
     <div className="container mx-auto px-4">
@@ -23,7 +28,10 @@ export default function RsvpInvalidCard({ variant }: { variant: "missing" | "not
       <EmptyState
         title={title}
         description={description}
-        action={{ label: t("rsvp.error.contact"), href: "mailto:contact@example.com" }}
+        action={{
+          label: t("rsvp.error.contact"),
+          href: `mailto:${supportEmail}`,
+        }}
       />
     </div>
   );

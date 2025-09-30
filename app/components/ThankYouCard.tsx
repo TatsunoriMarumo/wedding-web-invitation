@@ -12,13 +12,13 @@ export default function ThankYouCard({
   inviteeName,
   token,
   attendance,
-  supportEmail = "contact@example.com",
+  supportEmail,
 }: {
   imageSrc?: string;
   inviteeName?: string;
   token?: string | null;
   attendance?: Attendance;
-  supportEmail?: string;
+  supportEmail: string;
 }) {
   const { t } = useLanguage();
 
@@ -55,10 +55,7 @@ export default function ThankYouCard({
           </p>
 
           <div className="mt-4">
-            <ThankYouActions
-              token={token ?? undefined}
-              supportEmail={supportEmail}
-            />
+            <ThankYouActions token={token ?? undefined} supportEmail={supportEmail} />
           </div>
         </div>
       </div>
