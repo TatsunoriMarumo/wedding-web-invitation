@@ -219,14 +219,29 @@ type SubmitState = { ok: boolean; error?: string; updated?: Guest };
 const COMMON_ALLERGENS = ["卵", "乳製品", "小麦", "そば", "落花生", "えび", "かに", "大豆", "ナッツ類", "魚介類"];
 
 const normStr = (s?: string | null) => (s ?? "").trim();
-const toISO10 = (d: any) => {
+
+type BirthValue = Guest["birthDate"] | null | undefined;
+
+const toISO10 = (d: BirthValue): string => {
+  if (!d) return "";
   try {
-    if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
-    return new Date(d).toISOString().slice(0, 10);
+    if (typeof d === "string") {
+      // すでにYYYY-MM-DDならそのまま10桁
+      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+      // 文字列日時ならparseしてYYYY-MM-DD化
+      const t = Date.parse(d);
+      if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+      return "";
+    }
+    if (d instanceof Date) {
+      return d.toISOString().slice(0, 10);
+    }
+    return "";
   } catch {
     return "";
   }
 };
+
 const uniqSort = (arr: string[]) => Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean))).sort();
 const arrEq = (a: string[], b: string[]) => {
   if (a.length !== b.length) return false;

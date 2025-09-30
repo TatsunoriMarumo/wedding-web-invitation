@@ -4,145 +4,198 @@
 import { z } from "zod";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
 import prisma from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import type { Guest, InviteToken } from "@/lib/types";
 import { requireAdmin } from "@/lib/requireAdmin";
 import { canonicalizeEmail } from "@/lib/email";
 import type { AdminActionState } from "./actions.shared";
 import { signOut } from "@/auth";
+import crypto from "node:crypto";
 
-// ---- 追加：useActionState用の固定状態型（null許容） ----
+/* =========================================================
+ * 共通: DTO 変換ユーティリティ（Date→ISO、birthDate→YYYY-MM-DD）
+ * ========================================================= */
+
+type RowAllergen = {
+  id: number;
+  name: string;
+  category: "DOG" | "FOOD";
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+type RowGuestAllergy = {
+  guestId: number;
+  allergenId: number;
+  notedAt?: Date;
+  allergen: RowAllergen;
+};
+
+type RowGuest = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  birthDate: Date | string | null;
+  email: string | null;
+  phone: string | null;
+  attendance: "ATTEND" | "DECLINE";
+  createdAt: Date;
+  updatedAt: Date;
+  allergies: RowGuestAllergy[];
+};
+
+const toISO = (d: Date | string): string => new Date(d).toISOString();
+const toISO10 = (d: Date | string | null): string =>
+  d ? new Date(d).toISOString().slice(0, 10) : "";
+
+const toGuestDTO = (row: RowGuest): Guest => ({
+  id: row.id,
+  firstName: row.firstName,
+  lastName: row.lastName,
+  birthDate: toISO10(row.birthDate), // YYYY-MM-DD
+  email: row.email,
+  phone: row.phone,
+  attendance: row.attendance,
+  createdAt: toISO(row.createdAt),
+  updatedAt: toISO(row.updatedAt),
+  allergies: (row.allergies ?? []).map((ga) => ({
+    allergen: {
+      category: ga.allergen.category,
+      name: ga.allergen.name,
+    },
+  })),
+});
+
+const toTokenDTO = (t: {
+  id: number;
+  token: string;
+  inviteeName: string;
+  isUsed: boolean;
+  usedAt: Date | null;
+  createdAt: Date;
+}): InviteToken => ({
+  id: t.id,
+  token: t.token,
+  inviteeName: t.inviteeName,
+  isUsed: t.isUsed,
+  usedAt: t.usedAt ? toISO(t.usedAt) : null,
+  createdAt: toISO(t.createdAt),
+});
+
+/* ======================
+ * Admin 初期データ取得
+ * ====================== */
+
+export async function getAdminData(): Promise<{
+  tokens: InviteToken[];
+  guests: Guest[];
+  admins: { id: number; email: string; canonical: string }[];
+}> {
+  await requireAdmin();
+  noStore();
+
+  const [rawTokens, rawGuests, rawAdmins] = await Promise.all([
+    prisma.invitationToken.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.guest.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { allergies: { include: { allergen: true } } },
+    }),
+    prisma.admin.findMany({ orderBy: { email: "asc" } }),
+  ]);
+
+  return {
+    tokens: rawTokens.map(toTokenDTO),
+    guests: rawGuests.map((g) => toGuestDTO(g as unknown as RowGuest)),
+    admins: rawAdmins.map((a) => ({
+      id: a.id,
+      email: a.email,
+      canonical: a.canonical,
+    })),
+  };
+}
+
+/* ==========================
+ * 招待トークンの作成・削除
+ * ========================== */
+
 export type TokenActionState = {
   message: string | null;
   token: InviteToken | null;
 };
-  
-// 既存: 管理画面データ取得
-export async function getAdminData() {
-  noStore();
-  try {
-    const [rawTokens, rawGuests] = await Promise.all([
-      prisma.invitationToken.findMany({ orderBy: { createdAt: "desc" } }),
-      prisma.guest.findMany({
-        orderBy: { createdAt: "desc" },
-        include: { allergies: { include: { allergen: true } } },
-      }),
-    ]);
 
-    const tokens: InviteToken[] = rawTokens.map((t) => ({
-      id: t.id,
-      token: t.token,
-      inviteeName: t.inviteeName,
-      isUsed: t.isUsed,
-      usedAt: t.usedAt ? t.usedAt.toISOString() : null,
-      createdAt: t.createdAt.toISOString(),
-    }));
+const genToken = (): string => {
+  // 小文字英数字ベースの見やすいトークン（例: inv_voz613avmfuy5qlw）
+  const buf = crypto.randomBytes(12).toString("hex"); // 24 hex chars
+  return `inv_${BigInt("0x" + buf).toString(36)}`;
+};
 
-    const guests: Guest[] = rawGuests.map((g) => ({
-      id: g.id,
-      firstName: g.firstName,
-      lastName: g.lastName,
-      birthDate: g.birthDate,
-      email: g.email ?? null,
-      phone: g.phone ?? null,
-      attendance: g.attendance as "ATTEND" | "DECLINE",
-      invitationTokenId: g.invitationTokenId ?? null,
-      createdAt: g.createdAt.toISOString(),
-      allergies: (g.allergies ?? []).map((a) => ({
-        allergen: {
-          category: a.allergen.category as "DOG" | "FOOD",
-          name: a.allergen.name,
-        },
-      })),
-    }));
-
-    return { tokens, guests };
-  } catch (error) {
-    console.error("データの取得に失敗しました:", error);
-    return { error: "データの取得に失敗しました。" };
-  }
-}
-
-// 既存: 招待トークン作成
 export async function createInvitationToken(
   prevState: TokenActionState,
   formData: FormData
 ): Promise<TokenActionState> {
+  await requireAdmin();
+
   const schema = z.object({
-    inviteeName: z.string().min(1, "招待者名は必須です"),
+    inviteeName: z.string().trim().min(1, "招待者名は必須です"),
   });
 
-  const validated = schema.safeParse({
+  const parsed = schema.safeParse({
     inviteeName: formData.get("inviteeName"),
   });
 
-  if (!validated.success) {
+  if (!parsed.success) {
     return {
-      message: validated.error.flatten().fieldErrors.inviteeName?.[0] ?? "入力エラー",
+      message:
+        parsed.error.flatten().fieldErrors.inviteeName?.[0] ?? "入力エラー",
       token: null,
     };
   }
 
   try {
-    const { inviteeName } = validated.data;
-    const tokenStr = `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
-
+    const tokenStr = genToken();
     const created = await prisma.invitationToken.create({
-      data: { token: tokenStr, inviteeName },
+      data: { token: tokenStr, inviteeName: parsed.data.inviteeName },
     });
 
-    const dto: InviteToken = {
-      id: created.id,
-      token: created.token,
-      inviteeName: created.inviteeName,
-      isUsed: created.isUsed,
-      usedAt: created.usedAt ? created.usedAt.toISOString() : null,
-      createdAt: created.createdAt.toISOString(),
-    };
-
+    const dto = toTokenDTO(created);
     revalidatePath("/admin");
     return { message: "success", token: dto };
-  } catch (e) {
-    console.error("createInvitationToken failed:", e);
+  } catch {
     return { message: "トークンの作成に失敗しました。", token: null };
   }
 }
 
-// 新規追加: 招待トークン削除
-export async function deleteInvitationToken(tokenId: number): Promise<{ success: boolean; message: string }> {
+export async function deleteInvitationToken(
+  tokenId: number
+): Promise<{ success: boolean; message: string }> {
+  await requireAdmin();
+
   try {
-    // トークンが使用済みかチェック
     const token = await prisma.invitationToken.findUnique({
       where: { id: tokenId },
-      include: { guests: true }
+      include: { guests: true },
     });
 
     if (!token) {
       return { success: false, message: "トークンが見つかりません。" };
     }
-
-    if (token.isUsed || token.guests.length > 0) {
-      return { 
-        success: false, 
-        message: "使用済みのトークンは削除できません。" 
+    if (token.isUsed || (token.guests?.length ?? 0) > 0) {
+      return {
+        success: false,
+        message: "使用済みのトークンは削除できません。",
       };
     }
 
-    // トークンを削除
-    await prisma.invitationToken.delete({
-      where: { id: tokenId }
-    });
-
+    await prisma.invitationToken.delete({ where: { id: tokenId } });
     revalidatePath("/admin");
     return { success: true, message: "トークンを削除しました。" };
-  } catch (error) {
-    console.error("deleteInvitationToken failed:", error);
-    return { 
-      success: false, 
-      message: "トークンの削除に失敗しました。" 
-    };
+  } catch {
+    return { success: false, message: "削除に失敗しました。" };
   }
 }
+
+/* ==================
+ * ゲスト情報の更新
+ * ================== */
 
 const PhoneSchema = z
   .string()
@@ -157,123 +210,152 @@ const GuestUpdateSchema = z.object({
   id: z.number(),
   lastName: z.string().trim().min(1),
   firstName: z.string().trim().min(1),
-  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD
   email: z.string().trim().email().nullable().optional(),
   phone: z.string().trim().nullable().optional(),
   attendance: z.enum(["ATTEND", "DECLINE"]),
   dogAllergy: z.boolean(),
-  foodAllergies: z.array(z.string().trim().min(1)).max(50),
+  foodAllergies: z.array(z.string().trim().min(1)).default([]),
 });
 
-function toNullIfEmpty(v: unknown) {
-  if (v == null) return null;
-  const s = String(v).trim();
-  return s.length ? s : null;
-}
+const toNullIfEmpty = (s: string | null | undefined): string | null => {
+  const v = (s ?? "").trim();
+  return v.length ? v : null;
+};
 
-type GuestWithAllergies = Prisma.GuestGetPayload<{
-  include: { allergies: { include: { allergen: true } } };
-}>;
-
-export type UpdateGuestResult =
-  | { ok: true; updated: GuestWithAllergies | null }
+type UpdateGuestResult =
+  | { ok: true; updated: Guest }
   | { ok: false; error: string };
 
-export async function updateGuestAction(fd: FormData): Promise<UpdateGuestResult> {
-  try {
-    const raw = fd.get("payload");
-    if (!raw || typeof raw !== "string") {
-      return { ok: false, error: "no payload" };
-    }
-    const parsed = GuestUpdateSchema.parse(JSON.parse(raw));
+export async function updateGuestAction(
+  fd: FormData
+): Promise<UpdateGuestResult> {
+  await requireAdmin();
 
-    const email = toNullIfEmpty(parsed.email);
-    const phoneRaw = toNullIfEmpty(parsed.phone);
-    if (phoneRaw) {
-      // phone 形式チェック（任意だが入っていれば検証）
-      PhoneSchema.parse(phoneRaw);
-    }
+  const raw = fd.get("payload");
+  if (!raw || typeof raw !== "string") {
+    return { ok: false, error: "no payload" };
+  }
 
-    // アレルゲンのIDを確定
-    const allergenIds: number[] = [];
+  const parsed = GuestUpdateSchema.safeParse(JSON.parse(raw));
+  if (!parsed.success) {
+    return { ok: false, error: "invalid payload" };
+  }
+  const p = parsed.data;
 
-    if (parsed.dogAllergy) {
-      const dog = await prisma.allergen.findFirst({
-        where: { category: "DOG" },
+  const email = toNullIfEmpty(p.email);
+  const phone = toNullIfEmpty(p.phone);
+  if (phone) {
+    // 任意だが入っていれば形式チェック
+    PhoneSchema.parse(phone);
+  }
+
+  // 目標アレルゲンID群を作る（DOG 1つ + FOOD 複数）
+  const targetAllergenIds: number[] = [];
+
+  // DOG
+  if (p.dogAllergy) {
+    const dog = await prisma.allergen.findFirst({
+      where: { category: "DOG" },
+      select: { id: true },
+    });
+    if (dog) {
+      targetAllergenIds.push(dog.id);
+    } else {
+      const createdDog = await prisma.allergen.create({
+        data: { category: "DOG", name: "DOG" },
         select: { id: true },
       });
-      if (dog) {
-        allergenIds.push(dog.id);
-      } else {
-        const created = await prisma.allergen.create({
-          data: { category: "DOG", name: "DOG" },
-          select: { id: true },
-        });
-        allergenIds.push(created.id);
-      }
+      targetAllergenIds.push(createdDog.id);
     }
+  }
 
-    // 食品アレルギー（重複除去）
-    const uniqueFoods = Array.from(new Set(parsed.foodAllergies.map((s) => s.trim()).filter(Boolean)));
-    if (uniqueFoods.length) {
-      const foods = await Promise.all(
-        uniqueFoods.map(async (name) => {
-          const found = await prisma.allergen.findFirst({
-            where: { category: "FOOD", name },
-            select: { id: true },
-          });
-          if (found) return found.id;
-          const created = await prisma.allergen.create({
-            data: { category: "FOOD", name },
-            select: { id: true },
-          });
-          return created.id;
-        })
-      );
-      allergenIds.push(...foods);
+  // FOOD（重複除去）
+  const uniqueFoods = Array.from(new Set(p.foodAllergies.map((s) => s.trim()).filter(Boolean)));
+  for (const name of uniqueFoods) {
+    const found = await prisma.allergen.findFirst({
+      where: { category: "FOOD", name },
+      select: { id: true },
+    });
+    if (found) {
+      targetAllergenIds.push(found.id);
+    } else {
+      const created = await prisma.allergen.create({
+        data: { category: "FOOD", name },
+        select: { id: true },
+      });
+      targetAllergenIds.push(created.id);
     }
+  }
 
-    // まとめて更新
-    const updated = await prisma.$transaction(async (tx) => {
-      await tx.guest.update({
-        where: { id: parsed.id },
-        data: {
-          lastName: parsed.lastName,
-          firstName: parsed.firstName,
-          birthDate: new Date(parsed.birthDate),
-          email,
-          phone: phoneRaw,
-          attendance: parsed.attendance,
-        },
-      });
+  // 既存リンク（DOG/FOOD のみ）を取得
+  const existing = await prisma.guest.findUnique({
+    where: { id: p.id },
+    include: { allergies: { include: { allergen: true } } },
+  });
+  if (!existing) return { ok: false, error: "guest not found" };
 
-      // 中間テーブルを張り替え
-      await tx.guestAllergy.deleteMany({ where: { guestId: parsed.id } });
-      if (allergenIds.length) {
-        await tx.guestAllergy.createMany({
-          data: allergenIds.map((aid) => ({ guestId: parsed.id, allergenId: aid })),
-          skipDuplicates: true,
-        });
-      }
+  const existingLinks = (existing.allergies ?? []).filter(
+    (ga) => ga.allergen.category === "DOG" || ga.allergen.category === "FOOD"
+  );
+  const existingIds = new Set<number>(existingLinks.map((ga) => ga.allergenId));
+  const targetIds = new Set<number>(targetAllergenIds);
 
-      // 最新を取得（画面反映用）
-      return tx.guest.findUnique({
-        where: { id: parsed.id },
-        include: {
-          allergies: { include: { allergen: true } },
-        },
-      });
+  const toAdd: number[] = [];
+  for (const id of targetIds) if (!existingIds.has(id)) toAdd.push(id);
+
+  const toRemove: number[] = [];
+  for (const id of existingIds) if (!targetIds.has(id)) toRemove.push(id);
+
+  // まとめて更新
+  await prisma.$transaction(async (tx) => {
+    await tx.guest.update({
+      where: { id: p.id },
+      data: {
+        lastName: p.lastName,
+        firstName: p.firstName,
+        birthDate: new Date(`${p.birthDate}T00:00:00.000Z`),
+        email,
+        phone,
+        attendance: p.attendance,
+      },
     });
 
-    revalidatePath("/");
-    revalidatePath("/admin");
+    if (toRemove.length) {
+      await tx.guestAllergy.deleteMany({
+        where: { guestId: p.id, allergenId: { in: toRemove } },
+      });
+    }
+    if (toAdd.length) {
+      await tx.guestAllergy.createMany({
+        data: toAdd.map((aid) => ({
+          guestId: p.id,
+          allergenId: aid,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  });
 
-    return { ok: true, updated };
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "update failed";
-    return { ok: false, error: message };
-  }
+  // 更新後を取得して DTO 化
+  const refreshed = await prisma.guest.findUnique({
+    where: { id: p.id },
+    include: { allergies: { include: { allergen: true } } },
+  });
+  if (!refreshed) return { ok: false, error: "failed to reload updated guest" };
+
+  const dto = toGuestDTO(refreshed as unknown as RowGuest);
+
+  // revalidate（redirect しない）
+  revalidatePath("/");
+  revalidatePath("/admin");
+
+  return { ok: true, updated: dto };
 }
+
+/* ===========================
+ * Admin メールの追加・削除
+ * =========================== */
 
 const EmailSchema = z.object({ email: z.string().email() });
 
@@ -298,7 +380,7 @@ export async function addAdminEmail(
     revalidatePath("/admin");
     return { ok: true };
   } catch {
-    return { error: "Failed to add (maybe already exists)." };
+    return { error: "Failed to add admin." };
   }
 }
 
@@ -308,7 +390,10 @@ export async function removeAdminEmail(
 ): Promise<AdminActionState> {
   await requireAdmin();
 
-  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  const parsed = EmailSchema.safeParse({ email: fd.get("email") });
+  if (!parsed.success) return { error: "Invalid email." };
+
+  const email = parsed.data.email.toLowerCase();
   const canonical = canonicalizeEmail(email);
 
   const total = await prisma.admin.count();
@@ -322,6 +407,10 @@ export async function removeAdminEmail(
     return { error: "Not found or cannot delete." };
   }
 }
+
+/* ========
+ * Signout
+ * ======== */
 
 export async function signOutToSignin() {
   await signOut({ redirectTo: "/signin" });

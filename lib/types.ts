@@ -18,6 +18,7 @@ export interface Guest {
   attendance: "ATTEND" | "DECLINE";
   invitationTokenId?: number | null;
   createdAt: string;
+  updatedAt: string;
   allergies: Array<{
     allergen: {
       category: "DOG" | "FOOD";
