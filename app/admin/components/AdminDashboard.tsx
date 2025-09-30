@@ -16,8 +16,8 @@ interface AdminDashboardProps {
   initialAdmins: { id: number; email: string; canonical: string }[];
 }
 
-/** 受け取りうる型を限定して any を排除 */
-type BirthdateInput = string | number | Date | null | undefined;
+/** Guest型のbirthDateに追随する安全な入力型（null/undefinedも許容） */
+type BirthValue = Guest["birthDate"] | null | undefined;
 
 export function AdminDashboard({
   initialTokens,
@@ -57,8 +57,12 @@ export function AdminDashboard({
     if (typeof window === "undefined") return;
     const XLSX = await import("xlsx"); // ← 1回だけ
 
-    const toDate = (d: string | Date | null | undefined) =>
-      d ? (typeof d === "string" ? d.slice(0, 10) : d.toISOString().slice(0, 10)) : "";
+    const toDate = (d: BirthValue) => {
+      if (!d) return "";
+      if (d instanceof Date) return d.toISOString().slice(0, 10);
+      if (typeof d === "string") return d.slice(0, 10);
+      return "";
+    };
 
     const jpAttendance = (a: string | null | undefined) =>
       a === "ATTEND" ? "出席" : a === "DECLINE" ? "欠席" : "";
@@ -68,9 +72,9 @@ export function AdminDashboard({
     const attendanceRank = (a: string | null | undefined) =>
       a === "ATTEND" ? 0 : a === "DECLINE" ? 1 : 2;
 
-    const birthEpoch = (d: string | Date | null | undefined) => {
+    const birthEpoch = (d: BirthValue) => {
       if (!d) return Number.POSITIVE_INFINITY;
-      const date = typeof d === "string" ? new Date(d) : d;
+      const date = d instanceof Date ? d : typeof d === "string" ? new Date(d) : undefined;
       const t = date?.getTime();
       return Number.isFinite(t) ? (t as number) : Number.POSITIVE_INFINITY;
     };
@@ -80,7 +84,7 @@ export function AdminDashboard({
       if (ar !== 0) return ar;
       const ln = (a.lastName ?? "").localeCompare(b.lastName ?? "", "ja");
       if (ln !== 0) return ln;
-      const be = birthEpoch(a.birthDate as any) - birthEpoch(b.birthDate as any);
+      const be = birthEpoch(a.birthDate) - birthEpoch(b.birthDate);
       if (be !== 0) return be;
       const fn = (a.firstName ?? "").localeCompare(b.firstName ?? "", "ja");
       if (fn !== 0) return fn;
@@ -97,7 +101,7 @@ export function AdminDashboard({
       return {
         姓: g.lastName,
         名: g.firstName,
-        生年月日: toDate(g.birthDate as any),
+        生年月日: toDate(g.birthDate),
         出欠: jpAttendance(g.attendance),
         メールアドレス: g.email ?? "",
         電話番号: g.phone ?? "",
@@ -120,8 +124,6 @@ export function AdminDashboard({
       headers.map((h) => ({ wpx: Math.ceil(Math.max(measurePx(h), ...rows.map((r) => measurePx(r[h])))) + 8 }));
 
     const guestsHeaders = ["姓", "名", "生年月日", "出欠", "メールアドレス", "電話番号", "犬アレルギー", "食品アレルギー"];
-
-    // ← ここに2回目の `const XLSX = await import("xlsx");` があったのを削除
 
     const guestsSheet = XLSX.utils.json_to_sheet(guestsRows, { header: guestsHeaders });
     guestsSheet["!cols"] = fitColsWpx(guestsRows, guestsHeaders);
