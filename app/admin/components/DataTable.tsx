@@ -89,11 +89,11 @@ export function DataTable<TData, TValue>({
     <div className="w-full">
       {/* コントロール類：モバイルは縦積み、md以上で横並び */}
       <div className="flex flex-col gap-2 pb-3 md:flex-row md:items-center md:justify-between">
-        <div className="w-full md:w-auto">
-          <DataTableFilter table={table} />
-        </div>
         <div className="w-full md:w-auto md:ml-auto">
           <DataTableViewOptions table={table} />
+        </div>
+        <div className="w-full md:w-auto">
+          <DataTableFilter table={table} />
         </div>
       </div>
 
