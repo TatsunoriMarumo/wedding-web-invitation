@@ -1,37 +1,32 @@
 // app/admin/components/GuestTable.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileSpreadsheet, Pencil } from "lucide-react";
 import { useLanguage } from "@/app/providers";
-import { Guest } from "@/lib/types";
+import type { Guest } from "@/lib/types";
 import GuestEditDialog from "./GuestEditDialog";
 
-/** birthDate の受け取りを限定して any を排除 */
-type BirthdateInput = string | number | Date | null | undefined;
+import { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "./DataTable";
+import { DataTableColumnHeader } from "./DataTableColumnHeader";
 
-/** birthDate を持つかを安全に判定する type guard */
-type HasBirthDate = { birthDate?: BirthdateInput };
-const hasBirthDate = (v: unknown): v is HasBirthDate =>
-  typeof v === "object" && v !== null && "birthDate" in v;
+/** 型ヘルパ */
+type BirthValue = Guest["birthDate"] | null | undefined;
 
-const formatBirthdate = (bd: BirthdateInput): string => {
-  if (!bd) return "";
-  if (typeof bd === "string") {
-    const m = bd.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? `${m[1]}/${m[2]}/${m[3]}` : new Date(bd).toLocaleDateString("ja-JP");
-  }
-  if (typeof bd === "number") {
-    return new Date(bd).toLocaleDateString("ja-JP");
-  }
-  if (bd instanceof Date) {
-    return bd.toLocaleDateString("ja-JP");
-  }
-  return "";
+const toIsoDateText = (d: BirthValue) => {
+  if (!d) return "";
+  const date = d instanceof Date ? d : typeof d === "string" ? new Date(d) : undefined;
+  if (!date || isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10); // YYYY-MM-DD
+};
+
+const toIsoDateTimeText = (d: unknown) => {
+  const date = new Date(d as any);
+  return isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 19).replace("T", " ");
 };
 
 interface GuestTableProps {
@@ -43,6 +38,113 @@ interface GuestTableProps {
 export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTableProps) {
   const { t } = useLanguage();
   const [editing, setEditing] = useState<Guest | null>(null);
+
+  const columns: ColumnDef<Guest>[] = useMemo(
+    () => [
+      {
+        id: "fullName",
+        meta: { title: t("admin.guests.table.name") },
+        enableHiding: false,
+        accessorFn: (row) => `${row.lastName ?? ""} ${row.firstName ?? ""}`.trim(),
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.name")} />,
+        cell: ({ row }) => <span className="font-medium whitespace-nowrap">{row.getValue<string>("fullName")}</span>,
+      },
+      {
+        accessorKey: "email",
+        meta: { title: t("admin.guests.table.email") ?? "Email" },
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.email") ?? "Email"} />,
+        cell: ({ row }) => <span className="text-sm">{row.original.email || t("admin.guests.table.notRegistered")}</span>,
+      },
+      {
+        accessorKey: "phone",
+        meta: { title: t("admin.guests.table.phone") ?? "Phone" },
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.phone") ?? "Phone"} />,
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-500">{row.original.phone || t("admin.guests.table.notRegistered")}</span>
+        ),
+      },
+      {
+        id: "attendanceText",
+        meta: { title: t("admin.guests.table.attendance") },
+        accessorFn: (row) =>
+          row.attendance === "ATTEND"
+            ? (t("admin.guests.table.attend") ?? "出席")
+            : row.attendance === "DECLINE"
+            ? (t("admin.guests.table.decline") ?? "欠席")
+            : "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.attendance")} />,
+        cell: ({ row }) => {
+          const a = row.original.attendance;
+          return (
+            <Badge variant={a === "ATTEND" ? "default" : "destructive"}>
+              {a === "ATTEND" ? t("admin.guests.table.attend") : t("admin.guests.table.decline")}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: "allergyText",
+        meta: { title: t("admin.guests.table.allergies") },
+        accessorFn: (row) =>
+          (row.allergies ?? [])
+            .map((a) => a.allergen?.name)
+            .filter(Boolean)
+            .join("、"),
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.allergies")} />,
+        cell: ({ row }) => {
+          const items =
+            (row.original.allergies ?? [])
+              .map((a) => a.allergen?.name)
+              .filter(Boolean) as string[];
+          return items.length ? (
+            <div className="text-sm flex flex-wrap gap-1">
+              {items.map((name, i) => (
+                <Badge key={i} variant="outline">
+                  {name}
+                </Badge>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-500">{t("admin.guests.table.none")}</span>
+          );
+        },
+      },
+      {
+        id: "birthdateText",
+        meta: { title: t("admin.guests.table.birthdate") },
+        accessorFn: (row) => toIsoDateText(row.birthDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.birthdate")} />,
+        cell: ({ row }) => {
+          const iso = row.getValue<string>("birthdateText");
+          return <span className="whitespace-nowrap">{iso ? iso.replaceAll("-", "/") : ""}</span>;
+        },
+      },
+      {
+        id: "createdAtText",
+        meta: { title: t("admin.guests.table.registeredAt") },
+        accessorFn: (row) => toIsoDateTimeText(row.createdAt),
+        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.registeredAt")} />,
+        cell: ({ row }) => {
+          const d = new Date(row.original.createdAt as any);
+          return <span className="whitespace-nowrap">{isNaN(d.getTime()) ? "" : d.toLocaleString("ja-JP")}</span>;
+        },
+      },
+      {
+        id: "actions",
+        meta: { title: t("admin.guests.table.actions") },
+        enableSorting: false,
+        header: () => <div className="font-bold">{t("admin.guests.table.actions")}</div>,
+        cell: ({ row }) => (
+          <Button variant="outline" size="sm" onClick={() => setEditing(row.original)}>
+            <Pencil className="h-4 w-4 mr-1" />
+            {t("admin.guests.editButton")}
+          </Button>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t]
+  );
 
   return (
     <Card>
@@ -59,66 +161,7 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
         </div>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="whitespace-nowrap">{t("admin.guests.table.name")}</TableHead>
-                <TableHead>{t("admin.guests.table.contact")}</TableHead>
-                <TableHead>{t("admin.guests.table.attendance")}</TableHead>
-                <TableHead>{t("admin.guests.table.allergies")}</TableHead>
-                <TableHead>{t("admin.guests.table.birthdate")}</TableHead>
-                <TableHead className="whitespace-nowrap">{t("admin.guests.table.registeredAt")}</TableHead>
-                <TableHead className="whitespace-nowrap">{t("admin.guests.table.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {guests.map((guest) => (
-                <TableRow key={guest.id}>
-                  <TableCell className="font-medium whitespace-nowrap">
-                    {guest.lastName} {guest.firstName}
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      <div>{guest.email || t("admin.guests.table.notRegistered")}</div>
-                      <div className="text-gray-500">{guest.phone || t("admin.guests.table.notRegistered")}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={guest.attendance === "ATTEND" ? "default" : "destructive"}>
-                      {guest.attendance === "ATTEND" ? t("admin.guests.table.attend") : t("admin.guests.table.decline")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="text-sm flex flex-wrap gap-1">
-                      {guest.allergies.length > 0 ? (
-                        guest.allergies.map((allergy, index) => (
-                          <Badge key={index} variant="outline">
-                            {allergy.allergen.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <span className="text-gray-500">{t("admin.guests.table.none")}</span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {hasBirthDate(guest) ? formatBirthdate(guest.birthDate) : ""}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {new Date(guest.createdAt).toLocaleString("ja-JP")}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <Button variant="outline" size="sm" onClick={() => setEditing(guest)}>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      {t("admin.guests.editButton")}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <DataTable columns={columns} data={guests} />
       </CardContent>
 
       {editing && (

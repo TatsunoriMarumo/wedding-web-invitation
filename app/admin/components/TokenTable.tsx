@@ -1,15 +1,15 @@
 // app/admin/components/TokenTable.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { useLanguage } from "@/app/providers";
-import { InviteToken } from "@/lib/types";
+import type { InviteToken } from "@/lib/types";
 import { deleteInvitationToken } from "@/app/admin/actions";
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+import { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "./DataTable";
+import { DataTableColumnHeader } from "./DataTableColumnHeader";
+
 interface TokenTableProps {
   tokens: InviteToken[];
   onNewClick: () => void;
@@ -29,30 +33,29 @@ interface TokenTableProps {
 
 export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTableProps) {
   const { t } = useLanguage();
-  const [deletingTokenId, setDeletingTokenId] = useState<number | null>(null);
+
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingTokenId, setDeletingTokenId] = useState<number | null>(null);
   const [tokenToDelete, setTokenToDelete] = useState<InviteToken | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const copyTokenUrl = (token: string) => {
     const url = `${window.location.origin}?token=${token}`;
     navigator.clipboard.writeText(url);
-    alert("招待URLをクリップボードにコピーしました");
+    alert(t("admin.tokens.table.copiedToClipboard") ?? "招待URLをクリップボードにコピーしました");
   };
 
-  const handleDeleteClick = (token: InviteToken) => {
-    setTokenToDelete(token);
+  const handleDeleteClick = (tok: InviteToken) => {
+    setTokenToDelete(tok);
     setDeleteDialogOpen(true);
     setDeleteError(null);
   };
 
   const handleDeleteConfirm = async () => {
     if (!tokenToDelete) return;
-
     setDeletingTokenId(tokenToDelete.id);
     try {
       const result = await deleteInvitationToken(tokenToDelete.id);
-      
       if (result.success) {
         onTokenDeleted(tokenToDelete.id);
         setDeleteDialogOpen(false);
@@ -60,18 +63,94 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
       } else {
         setDeleteError(result.message);
       }
-    } catch (error) {
+    } catch {
       setDeleteError("削除中にエラーが発生しました。");
     } finally {
       setDeletingTokenId(null);
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-    setTokenToDelete(null);
-    setDeleteError(null);
-  };
+  const columns: ColumnDef<InviteToken>[] = useMemo(
+    () => [
+      {
+        accessorKey: "inviteeName",
+        meta: { title: t("admin.tokens.table.inviteeName") },
+        enableHiding: false,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.tokens.table.inviteeName")} />
+        ),
+        cell: ({ row }) => <span className="font-medium whitespace-nowrap">{row.original.inviteeName}</span>,
+      },
+      {
+        accessorKey: "token",
+        meta: { title: t("admin.tokens.table.token") },
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.tokens.table.token")} />
+        ),
+        cell: ({ row }) => <span className="font-mono text-sm break-all">{row.original.token}</span>,
+      },
+      {
+        id: "createdAtText",
+        meta: { title: t("admin.tokens.table.createdAt") },
+        accessorFn: (row) => {
+          const d = new Date(row.createdAt as any);
+          // フィルタ/ソートしやすい ISO 文字列
+          return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 19).replace("T", " ");
+        },
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.tokens.table.createdAt")} />
+        ),
+        cell: ({ row }) => {
+          const d = new Date(row.original.createdAt as any);
+          return <span className="whitespace-nowrap">{isNaN(d.getTime()) ? "" : d.toLocaleDateString("ja-JP")}</span>;
+        },
+      },
+      {
+        id: "statusText",
+        meta: { title: t("admin.tokens.table.status") },
+        accessorFn: (row) => (row.isUsed ? (t("admin.tokens.table.used") ?? "使用済み") : (t("admin.tokens.table.unused") ?? "未使用")),
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.tokens.table.status")} />
+        ),
+        cell: ({ row }) => (
+          <Badge variant={row.original.isUsed ? "default" : "secondary"}>
+            {row.original.isUsed ? t("admin.tokens.table.used") : t("admin.tokens.table.unused")}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        meta: { title: t("admin.tokens.table.action") },
+        enableSorting: false,
+        header: () => <div className="font-bold">{t("admin.tokens.table.action")}</div>,
+        cell: ({ row }) => {
+          const tok = row.original;
+          return (
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => copyTokenUrl(tok.token)} className="whitespace-nowrap">
+                <Copy className="h-4 w-4 mr-1" />
+                {t("admin.tokens.table.copyUrl")}
+              </Button>
+              {!tok.isUsed && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleDeleteClick(tok)}
+                  disabled={deletingTokenId === tok.id}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  aria-label={t("admin.tokens.table.delete") ?? "削除"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t, deletingTokenId]
+  );
 
   return (
     <>
@@ -82,8 +161,8 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
               <CardTitle>{t("admin.tokens.title")}</CardTitle>
               <CardDescription>{t("admin.tokens.description")}</CardDescription>
             </div>
-            <Button 
-              onClick={onNewClick} 
+            <Button
+              onClick={onNewClick}
               className="bg-gradient-to-r from-pink-500 to-orange-500 hover:from-pink-600 hover:to-orange-600 text-white w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -92,59 +171,7 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("admin.tokens.table.inviteeName")}</TableHead>
-                  <TableHead>{t("admin.tokens.table.token")}</TableHead>
-                  <TableHead className="whitespace-nowrap">{t("admin.tokens.table.createdAt")}</TableHead>
-                  <TableHead>{t("admin.tokens.table.status")}</TableHead>
-                  <TableHead>{t("admin.tokens.table.action")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tokens.map((token) => (
-                  <TableRow key={token.id}>
-                    <TableCell className="font-medium whitespace-nowrap">{token.inviteeName}</TableCell>
-                    <TableCell className="font-mono text-sm">{token.token}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {new Date(token.createdAt).toLocaleDateString("ja-JP")}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={token.isUsed ? "default" : "secondary"}>
-                        {token.isUsed ? t("admin.tokens.table.used") : t("admin.tokens.table.unused")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => copyTokenUrl(token.token)} 
-                          className="whitespace-nowrap"
-                        >
-                          <Copy className="h-4 w-4 mr-1" />
-                          {t("admin.tokens.table.copyUrl")}
-                        </Button>
-                        {!token.isUsed && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteClick(token)}
-                            disabled={deletingTokenId === token.id}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable columns={columns} data={tokens} />
         </CardContent>
       </Card>
 
@@ -160,17 +187,11 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
                   この操作は取り消すことができません。
                 </>
               )}
-              {deleteError && (
-                <div className="mt-2 text-red-600 font-medium">
-                  {deleteError}
-                </div>
-              )}
+              {deleteError && <div className="mt-2 text-red-600 font-medium">{deleteError}</div>}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleDeleteCancel}>
-              キャンセル
-            </AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>キャンセル</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={deletingTokenId !== null}

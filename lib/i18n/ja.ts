@@ -325,7 +325,7 @@ export const ja = {
     `,
     message: `ご予定の変更により出欠が変わる場合は
     お手数ですが直接ご連絡ください`,
-    copyright: "© 2025 拓人 & ひなの. All rights reserved.",
+    copyright: "© 2025 Tatsunori & Momona. All rights reserved.",
   },
   meta: {
     title: "藤岡家・和田家結婚披露宴招待状",
@@ -369,6 +369,8 @@ export const ja = {
         used: "使用済み",
         unused: "未使用",
         copyUrl: "URLコピー",
+        delete: "削除",
+        copiedToClipboard: "招待URLをクリップボードにコピーしました",
       },
     },
     guests: {
@@ -388,6 +390,8 @@ export const ja = {
         decline: "欠席",
         none: "なし",
         notRegistered: "未登録",
+        email: "Email",
+        phone: "電話番号",
       },
       editDialog: {
         title: "ゲスト情報を編集",

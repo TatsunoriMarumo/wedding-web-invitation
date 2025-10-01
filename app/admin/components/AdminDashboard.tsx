@@ -160,22 +160,14 @@ export function AdminDashboard({
 
   return (
     <>
-      <StatsCards tokens={tokens} guests={guests} />
+      <StatsCards guests={guests} />
 
-      <Tabs defaultValue="tokens" className="space-y-6 mt-8">
+      <Tabs defaultValue="guests" className="space-y-6 mt-8">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="tokens">{t("admin.tabs.tokens")}</TabsTrigger>
           <TabsTrigger value="guests">{t("admin.tabs.guests")}</TabsTrigger>
+          <TabsTrigger value="tokens">{t("admin.tabs.tokens")}</TabsTrigger>
           <TabsTrigger value="admins">{t("admin.tabs.admins")}</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="tokens">
-          <TokenTable
-            tokens={optimisticTokens}
-            onNewClick={() => setIsCreateDialogOpen(true)}
-            onTokenDeleted={handleTokenDeleted}
-          />
-        </TabsContent>
 
         <TabsContent value="guests">
           <GuestTable
@@ -184,6 +176,14 @@ export function AdminDashboard({
             onGuestUpdated={(g) =>
               setGuests((prev) => prev.map((x) => (x.id === g.id ? (g as Guest) : x)))
             }
+          />
+        </TabsContent>
+
+        <TabsContent value="tokens">
+          <TokenTable
+            tokens={optimisticTokens}
+            onNewClick={() => setIsCreateDialogOpen(true)}
+            onTokenDeleted={handleTokenDeleted}
           />
         </TabsContent>
 

@@ -491,7 +491,7 @@ export default function GuestEditDialog({
                       : "border-gray-200 hover:border-green-300"
                   }`}
                 >
-                  ✅ {t("rsvp.form.attend")}
+                  {t("rsvp.form.attend")}
                 </button>
 
                 <button
@@ -503,7 +503,7 @@ export default function GuestEditDialog({
                       : "border-gray-200 hover:border-red-300"
                   }`}
                 >
-                  ❌ {t("rsvp.form.decline")}
+                  {t("rsvp.form.decline")}
                 </button>
               </div>
             </div>
