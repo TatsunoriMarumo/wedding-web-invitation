@@ -169,7 +169,6 @@ export default function Access() {
           {/* 当日カード */}
           <div className="bg-gradient-to-br from-sky-50 to-pink-50 rounded-2xl p-6 border-2 border-dashed border-pink-200">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-              <span className="text-2xl mr-2">📱</span>
               {t("access.eventCard.title")}
             </h3>
             <div className="space-y-2 text-sm text-gray-700">
