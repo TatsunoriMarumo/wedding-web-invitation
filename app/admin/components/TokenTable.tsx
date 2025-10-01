@@ -31,6 +31,23 @@ interface TokenTableProps {
   onTokenDeleted: (tokenId: number) => void;
 }
 
+/** unknown を安全に Date へ変換 */
+const parseDate = (d: unknown): Date | null => {
+  if (d == null) return null;
+  if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
+  if (typeof d === "string" || typeof d === "number") {
+    const dt = new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
+  }
+  return null;
+};
+
+/** フィルタ/ソートしやすい ISOっぽい文字列 (YYYY-MM-DD HH:mm:ss) を返す */
+const toIsoDateTimeText = (d: unknown): string => {
+  const dt = parseDate(d);
+  return dt ? dt.toISOString().slice(0, 19).replace("T", " ") : "";
+};
+
 export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTableProps) {
   const { t } = useLanguage();
 
@@ -92,17 +109,13 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
       {
         id: "createdAtText",
         meta: { title: t("admin.tokens.table.createdAt") },
-        accessorFn: (row) => {
-          const d = new Date(row.createdAt as any);
-          // フィルタ/ソートしやすい ISO 文字列
-          return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 19).replace("T", " ");
-        },
+        accessorFn: (row) => toIsoDateTimeText(row.createdAt),
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title={t("admin.tokens.table.createdAt")} />
         ),
         cell: ({ row }) => {
-          const d = new Date(row.original.createdAt as any);
-          return <span className="whitespace-nowrap">{isNaN(d.getTime()) ? "" : d.toLocaleDateString("ja-JP")}</span>;
+          const d = parseDate(row.original.createdAt);
+          return <span className="whitespace-nowrap">{d ? d.toLocaleDateString("ja-JP") : ""}</span>;
         },
       },
       {
@@ -148,7 +161,6 @@ export function TokenTable({ tokens, onNewClick, onTokenDeleted }: TokenTablePro
         },
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [t, deletingTokenId]
   );
 

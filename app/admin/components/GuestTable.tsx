@@ -17,6 +17,17 @@ import { DataTableColumnHeader } from "./DataTableColumnHeader";
 /** 型ヘルパ */
 type BirthValue = Guest["birthDate"] | null | undefined;
 
+/** unknown を安全に Date へ変換 */
+const parseDate = (d: unknown): Date | null => {
+  if (d == null) return null;
+  if (d instanceof Date) return isNaN(d.getTime()) ? null : d;
+  if (typeof d === "string" || typeof d === "number") {
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+};
+
 const toIsoDateText = (d: BirthValue) => {
   if (!d) return "";
   const date = d instanceof Date ? d : typeof d === "string" ? new Date(d) : undefined;
@@ -25,8 +36,8 @@ const toIsoDateText = (d: BirthValue) => {
 };
 
 const toIsoDateTimeText = (d: unknown) => {
-  const date = new Date(d as any);
-  return isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 19).replace("T", " ");
+  const date = parseDate(d);
+  return date ? date.toISOString().slice(0, 19).replace("T", " ") : "";
 };
 
 interface GuestTableProps {
@@ -52,13 +63,17 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
       {
         accessorKey: "email",
         meta: { title: t("admin.guests.table.email") ?? "Email" },
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.email") ?? "Email"} />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.guests.table.email") ?? "Email"} />
+        ),
         cell: ({ row }) => <span className="text-sm">{row.original.email || t("admin.guests.table.notRegistered")}</span>,
       },
       {
         accessorKey: "phone",
         meta: { title: t("admin.guests.table.phone") ?? "Phone" },
-        header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.phone") ?? "Phone"} />,
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title={t("admin.guests.table.phone") ?? "Phone"} />
+        ),
         cell: ({ row }) => (
           <span className="text-sm text-gray-500">{row.original.phone || t("admin.guests.table.notRegistered")}</span>
         ),
@@ -92,10 +107,7 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
             .join("、"),
         header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.allergies")} />,
         cell: ({ row }) => {
-          const items =
-            (row.original.allergies ?? [])
-              .map((a) => a.allergen?.name)
-              .filter(Boolean) as string[];
+          const items = (row.original.allergies ?? []).map((a) => a.allergen?.name).filter(Boolean) as string[];
           return items.length ? (
             <div className="text-sm flex flex-wrap gap-1">
               {items.map((name, i) => (
@@ -125,8 +137,8 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
         accessorFn: (row) => toIsoDateTimeText(row.createdAt),
         header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.registeredAt")} />,
         cell: ({ row }) => {
-          const d = new Date(row.original.createdAt as any);
-          return <span className="whitespace-nowrap">{isNaN(d.getTime()) ? "" : d.toLocaleString("ja-JP")}</span>;
+          const d = parseDate(row.original.createdAt);
+          return <span className="whitespace-nowrap">{d ? d.toLocaleString("ja-JP") : ""}</span>;
         },
       },
       {
@@ -142,7 +154,6 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
         ),
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [t]
   );
 
