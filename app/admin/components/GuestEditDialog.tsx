@@ -1,20 +1,43 @@
 // app/admin/components/GuestEditDialog.tsx
 "use client";
 
-import { useMemo, useState, useActionState, startTransition, useEffect } from "react";
+import { useMemo, useState, useActionState, startTransition, useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { updateGuestAction } from "@/app/admin/actions"; // ← あなたの配置に合わせて
+import { updateGuestAction } from "@/app/admin/actions";
 import type { Guest } from "@/lib/types";
 import { useLanguage } from "@/app/providers";
 
 /* ===========================
- * Birthdate (JP) - RsvpForm風
+ * 共通：エラーテキスト行（高さ安定）
+ * =========================== */
+function FieldErrorLine({ message }: { message?: string | null }) {
+  return (
+    <p
+      aria-live="polite"
+      aria-hidden={!message}
+      className={`mt-1 text-sm h-5 leading-5 ${message ? "text-red-600" : "text-transparent"}`}
+    >
+      {message || "." /* 高さ安定用のダミー */}
+    </p>
+  );
+}
+
+/* ===========================
+ * 生年月日（RsvpForm と同じ数値入力UI）
  * =========================== */
 
-type YMD = { y: number | ""; m: number | ""; d: number | "" };
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
+const isoToDate = (iso?: string) => {
+  const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return undefined;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+};
 
-function BirthdateJP({
+type YMD = { y: string; m: string; d: string };
+
+function BirthdateInputsJP({
   label,
   value,
   onChange,
@@ -22,231 +45,209 @@ function BirthdateJP({
   error,
 }: {
   label: string;
-  value: string; // YYYY-MM-DD
-  onChange: (iso: string) => void;
+  value: string; // YYYY-MM-DD or "INVALID" or ""
+  onChange: (isoOrInvalid: string) => void;
   required?: boolean;
   error?: string;
 }) {
-  const today = useMemo(() => {
-    const t = new Date();
-    return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
-  }, []);
-  const START_YEAR = 1900;
-
-  const pad2 = (n: number) => String(n).padStart(2, "0");
-  const ymdToISO = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
-  const isValidYMD = (y?: number, m?: number, d?: number) => {
-    if (!y || !m || !d) return false;
-    const dt = new Date(Date.UTC(y, m - 1, d));
-    return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === m && dt.getUTCDate() === d;
-  };
+  const today = useMemo(() => new Date(), []);
+  const fromYear = 1900;
 
   const parseISO = (iso?: string): YMD => {
-    const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return { y: "", m: "", d: "" };
-    return { y: parseInt(m[1], 10), m: parseInt(m[2], 10), d: parseInt(m[3], 10) };
+    const d = isoToDate(iso);
+    if (!d) return { y: "", m: "", d: "" };
+    return { y: String(d.getFullYear()), m: String(d.getMonth() + 1), d: String(d.getDate()) };
   };
 
   const [local, setLocal] = useState<YMD>(() => parseISO(value));
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const years = useMemo(() => {
-    const arr: number[] = [];
-    for (let y = today.y; y >= START_YEAR; y--) arr.push(y);
-    return arr;
-  }, [today.y]);
-
-  const months = useMemo(() => {
-    if (local.y === "") return [];
-    const maxM = local.y === today.y ? today.m : 12;
-    return Array.from({ length: maxM }, (_, i) => i + 1);
-  }, [local.y, today.y, today.m]);
-
-  const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
-  const days = useMemo(() => {
-    if (local.y === "" || local.m === "") return [];
-    const y = local.y as number;
-    const m = local.m as number;
-    const maxDAll = daysInMonth(y, m);
-    const isThisMonth = y === today.y && m === today.m;
-    const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-    return Array.from({ length: maxD }, (_, i) => i + 1);
-  }, [local.y, local.m, today.y, today.m, today.d]);
-
-  const emitIfComplete = (next: YMD) => {
-    if (typeof next.y === "number" && typeof next.m === "number" && typeof next.d === "number") {
-      if (isValidYMD(next.y, next.m, next.d)) {
-        onChange(ymdToISO(next.y, next.m, next.d));
-        return;
-      }
-    }
-    onChange(""); // 未完成/不正は空
-  };
-
-  const onYearChange = (val: string) => {
-    const y: number | "" = val ? parseInt(val, 10) : "";
-    let m: number | "" = local.m;
-    let d: number | "" = local.d;
-
-    if (typeof y === "number") {
-      const maxM = y === today.y ? today.m : 12;
-      if (typeof m === "number" && m > maxM) {
-        m = "";
-        d = "";
-      }
-      if (typeof m === "number") {
-        const maxDAll = daysInMonth(y, m);
-        const isThisMonth = y === today.y && m === today.m;
-        const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-        if (typeof d === "number" && d > maxD) d = "";
-      }
+  useEffect(() => {
+    if (!value || value === "INVALID") {
+      setLocalError(value === "INVALID" ? "無効な日付です" : null);
+      if (!value) setLocal(parseISO(value));
     } else {
-      m = "";
-      d = "";
+      setLocal(parseISO(value));
+      setLocalError(null);
+    }
+  }, [value]);
+
+  const onlyDigits = (s: string) => s.replace(/\D/g, "");
+
+  const emit = (next: YMD) => {
+    const y = Number(next.y), m = Number(next.m), d = Number(next.d);
+
+    // 未完成はエラーなし・空値
+    if (!y || !m || !d) {
+      setLocalError(null);
+      onChange("");
+      return;
     }
 
-    const next: YMD = { y, m, d };
-    setLocal(next);
-    emitIfComplete(next);
-  };
-
-  const onMonthChange = (val: string) => {
-    const m: number | "" = val ? parseInt(val, 10) : "";
-    let d: number | "" = local.d;
-
-    if (typeof m === "number" && typeof local.y === "number") {
-      const y = local.y;
-      const maxDAll = daysInMonth(y, m);
-      const isThisMonth = y === today.y && m === today.m;
-      const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-      if (typeof d === "number" && d > maxD) d = "";
-    } else {
-      d = "";
+    if (y < fromYear || m < 1 || m > 12 || d < 1 || d > 31) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
     }
 
-    const next: YMD = { y: local.y, m, d };
-    setLocal(next);
-    emitIfComplete(next);
+    const maxD = daysInMonth(y, m);
+    if (d > maxD) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
+    }
+
+    const dt = new Date(y, m - 1, d);
+    if (dt > today) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
+    }
+
+    setLocalError(null);
+    onChange(`${y}-${pad2(m)}-${pad2(d)}`);
   };
 
-  const onDayChange = (val: string) => {
-    const d: number | "" = val ? parseInt(val, 10) : "";
-    const next: YMD = { y: local.y, m: local.m, d };
+  const setYear = (raw: string) => {
+    const y = onlyDigits(raw).slice(0, 4);
+    const next = { ...local, y };
     setLocal(next);
-    emitIfComplete(next);
+    emit(next);
   };
 
-  const selCls = (hasErr: boolean) =>
-    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${
-      hasErr ? "border-red-500" : "border-gray-300"
-    }`;
+  const setMonth = (raw: string) => {
+    let mm = onlyDigits(raw).slice(0, 2);
+    if (mm) mm = String(Math.min(parseInt(mm, 10), 12));
+    const next = { ...local, m: mm };
+    setLocal(next);
+    emit(next);
+  };
+
+  const setDay = (raw: string) => {
+    let dd = onlyDigits(raw).slice(0, 2);
+    if (dd) dd = String(Math.min(parseInt(dd, 10), 31));
+    const next = { ...local, d: dd };
+    setLocal(next);
+    emit(next);
+  };
+
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+  const normalizeMonth = () => {
+    if (!local.m) return;
+    const fixed = String(clamp(Number(local.m), 1, 12));
+    if (fixed !== local.m) {
+      const next = { ...local, m: fixed };
+      setLocal(next);
+      emit(next);
+    }
+  };
+  const normalizeDay = () => {
+    if (!local.y || !local.m || !local.d) return;
+    const maxD = daysInMonth(Number(local.y), Number(local.m));
+    const fixed = String(clamp(Number(local.d), 1, maxD));
+    if (fixed !== local.d) {
+      const next = { ...local, d: fixed };
+      setLocal(next);
+      emit(next);
+    }
+  };
+
+  const baseCls = (hasErr: boolean) =>
+    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent
+     ${hasErr ? "border-red-500" : "border-gray-300"}`;
+
+  const mergedError = localError || error;
 
   return (
-    <div>
+    <div className="scroll-mt-24">
       <label className="block text-sm font-medium text-gray-700 mb-2">
         {label} {required ? "*" : ""}
       </label>
-      <div className="flex gap-2">
-        <select
-          required={required}
-          value={local.y === "" ? "" : local.y}
-          onChange={(e) => onYearChange(e.target.value)}
-          className={`w-28 ${selCls(!!error)}`}
-        >
-          <option value="">年</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}年
-            </option>
-          ))}
-        </select>
 
-        <select
-          required={required}
-          value={local.m === "" ? "" : local.m}
-          onChange={(e) => onMonthChange(e.target.value)}
-          className={`w-24 ${selCls(!!error)}`}
-          disabled={local.y === ""}
-        >
-          <option value="">月</option>
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {m}月
-            </option>
-          ))}
-        </select>
+      <div className="grid grid-cols-3 gap-2">
+        {/* 年 */}
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="YYYY"
+            value={local.y}
+            onChange={(e) => setYear(e.target.value)}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">年</span>
+        </div>
 
-        <select
-          required={required}
-          value={local.d === "" ? "" : local.d}
-          onChange={(e) => onDayChange(e.target.value)}
-          className={`w-24 ${selCls(!!error)}`}
-          disabled={local.y === "" || local.m === ""}
-        >
-          <option value="">日</option>
-          {days.map((d) => (
-            <option key={d} value={d}>
-              {d}日
-            </option>
-          ))}
-        </select>
+        {/* 月 */}
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            placeholder="MM"
+            value={local.m}
+            onChange={(e) => setMonth(e.target.value)}
+            onBlur={normalizeMonth}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">月</span>
+        </div>
+
+        {/* 日 */}
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            placeholder="DD"
+            value={local.d}
+            onChange={(e) => setDay(e.target.value)}
+            onBlur={normalizeDay}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">日</span>
+        </div>
       </div>
+
       <p className="mt-2 text-xs text-gray-500">形式：YYYY/MM/DD（例：1990/06/15）</p>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+      <FieldErrorLine message={mergedError} />
     </div>
   );
 }
 
-function FieldErrorLine({ message }: { message?: string | null }) {
-  return (
-    <p
-      aria-live="polite"
-      aria-hidden={!message}
-      className={`mt-1 text-sm h-5 leading-5 ${
-        message ? "text-red-600" : "text-transparent"
-      }`}
-    >
-      {message || "." /* 高さを安定させるダミー */}
-    </p>
-  );
-}
-
 /* ===========================
- * 編集ダイアログ（RsvpForm寄せ）
+ * 編集ダイアログ（モバイルファースト）
  * =========================== */
 
 type SubmitState = { ok: boolean; error?: string; updated?: Guest };
 
 const COMMON_ALLERGENS = ["卵", "乳製品", "小麦", "そば", "落花生", "えび", "かに", "大豆", "ナッツ類", "魚介類"];
-
 const normStr = (s?: string | null) => (s ?? "").trim();
-
-type BirthValue = Guest["birthDate"] | null | undefined;
-
-const toISO10 = (d: BirthValue): string => {
-  if (!d) return "";
-  try {
-    if (typeof d === "string") {
-      // すでにYYYY-MM-DDならそのまま10桁
-      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
-      // 文字列日時ならparseしてYYYY-MM-DD化
-      const t = Date.parse(d);
-      if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
-      return "";
-    }
-    if (d instanceof Date) {
-      return d.toISOString().slice(0, 10);
-    }
-    return "";
-  } catch {
-    return "";
-  }
-};
-
 const uniqSort = (arr: string[]) => Array.from(new Set(arr.map((x) => x.trim()).filter(Boolean))).sort();
 const arrEq = (a: string[], b: string[]) => {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
+};
+
+const toISO10 = (d: Guest["birthDate"] | null | undefined): string => {
+  if (!d) return "";
+  try {
+    if (typeof d === "string") {
+      if (/^\d{4}-\d{2}-\d{2}/.test(d)) return d.slice(0, 10);
+      const t = Date.parse(d);
+      if (!Number.isNaN(t)) return new Date(t).toISOString().slice(0, 10);
+      return "";
+    }
+    if (d instanceof Date) return d.toISOString().slice(0, 10);
+    return "";
+  } catch {
+    return "";
+  }
 };
 
 export default function GuestEditDialog({
@@ -293,7 +294,7 @@ export default function GuestEditDialog({
   const [showAllergenSelect, setShowAllergenSelect] = useState(false);
   const [customAllergen, setCustomAllergen] = useState("");
 
-  // ▼ 姓・名のバリデーション（赤字エラー表示）
+  // ▼ 姓・名の必須エラー
   const [lnErr, setLnErr] = useState<string | null>(null);
   const [fnErr, setFnErr] = useState<string | null>(null);
 
@@ -307,8 +308,6 @@ export default function GuestEditDialog({
     return !lnE && !fnE;
   };
 
-  // ▲ ここまで
-
   const [state, dispatch, pending] = useActionState<SubmitState, FormData>(
     async (_prev, fd) => {
       const res = await updateGuestAction(fd);
@@ -318,7 +317,6 @@ export default function GuestEditDialog({
     { ok: false }
   );
 
-  // ✅ 成功時の親更新・クローズは useEffect で
   useEffect(() => {
     if (state.ok && state.updated) {
       onUpdated(state.updated);
@@ -326,7 +324,6 @@ export default function GuestEditDialog({
     }
   }, [state.ok, state.updated, onUpdated, onClose]);
 
-  // 変更有無（全フィールドが元と完全一致なら false）
   const isDirty = useMemo(() => {
     const curr = {
       lastName: normStr(lastName),
@@ -360,14 +357,13 @@ export default function GuestEditDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // ▼ 姓名の必須チェック（未入力なら赤字表示して送信しない）
     if (!validateNames()) return;
 
     const payload = {
       id: guest.id,
       lastName: normStr(lastName),
       firstName: normStr(firstName),
-      birthDate, // YYYY-MM-DD
+      birthDate, // YYYY-MM-DD or ""
       email: normStr(email) || null,
       phone: normStr(phone) || null,
       attendance,
@@ -382,12 +378,21 @@ export default function GuestEditDialog({
     });
   };
 
+  // 「その他を追加」入力の有効/無効
+  const canAddCustom = customAllergen.trim().length > 0;
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-2xl rounded-2xl p-0 overflow-hidden">
-        <form noValidate onInvalid={(e) => e.preventDefault()} onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 sm:p-8">
+      {/* モバイル優先：幅は画面-16px、背の高い端末でも 90dvh 内に収めて縦スクロール */}
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl rounded-2xl p-0 max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
+        <form
+          noValidate
+          onInvalid={(e) => e.preventDefault()}
+          onSubmit={handleSubmit}
+          className="bg-white rounded-2xl p-4 sm:p-8"
+        >
           <DialogHeader className="mb-2">
-            <DialogTitle className="text-2xl font-semibold text-gray-800">
+            <DialogTitle className="text-xl sm:text-2xl font-semibold text-gray-800">
               {t("admin.guests.editDialog.title")}
             </DialogTitle>
           </DialogHeader>
@@ -410,15 +415,14 @@ export default function GuestEditDialog({
                   value={lastName}
                   onChange={(e) => {
                     setLastName(e.target.value);
-                    if (lnErr) setLnErr(null); // 入力でエラー消去
+                    if (lnErr) setLnErr(null);
                   }}
                   onBlur={() => {
                     if (!normStr(lastName)) setLnErr(t("rsvp.form.validation.requiredLastName"));
                   }}
                   aria-invalid={!!lnErr}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    lnErr ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${lnErr ? "border-red-500" : "border-gray-300"
+                    }`}
                 />
                 <FieldErrorLine message={lnErr} />
               </div>
@@ -438,19 +442,18 @@ export default function GuestEditDialog({
                     if (!normStr(firstName)) setFnErr(t("rsvp.form.validation.requiredFirstName"));
                   }}
                   aria-invalid={!!fnErr}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${
-                    fnErr ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent transition-all ${fnErr ? "border-red-500" : "border-gray-300"
+                    }`}
                 />
                 <FieldErrorLine message={fnErr} />
               </div>
             </div>
 
-            {/* 生年月日（日本式セレクト） */}
-            <BirthdateJP
+            {/* 生年月日（RsvpForm と同じ数値入力UI） */}
+            <BirthdateInputsJP
               label={t("rsvp.form.birthdate")}
               value={birthDate}
-              onChange={(iso) => setBirthDate(iso)}
+              onChange={(isoOrInvalid) => setBirthDate(isoOrInvalid)}
               required
             />
 
@@ -485,11 +488,10 @@ export default function GuestEditDialog({
                 <button
                   type="button"
                   onClick={() => setAttendance("ATTEND")}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    attendance === "ATTEND"
+                  className={`p-4 rounded-xl border-2 transition-all ${attendance === "ATTEND"
                       ? "border-green-500 bg-green-50 text-green-700"
                       : "border-gray-200 hover:border-green-300"
-                  }`}
+                    }`}
                 >
                   {t("rsvp.form.attend")}
                 </button>
@@ -497,11 +499,10 @@ export default function GuestEditDialog({
                 <button
                   type="button"
                   onClick={() => setAttendance("DECLINE")}
-                  className={`p-4 rounded-xl border-2 transition-all ${
-                    attendance === "DECLINE"
+                  className={`p-4 rounded-xl border-2 transition-all ${attendance === "DECLINE"
                       ? "border-red-500 bg-red-50 text-red-700"
                       : "border-gray-200 hover:border-red-300"
-                  }`}
+                    }`}
                 >
                   {t("rsvp.form.decline")}
                 </button>
@@ -517,18 +518,16 @@ export default function GuestEditDialog({
                   <button
                     type="button"
                     onClick={() => setDogAllergy(false)}
-                    className={`p-3 rounded-lg border-2 transition-all text-sm ${
-                      !dogAllergy ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
-                    }`}
+                    className={`p-3 rounded-lg border-2 transition-all text-sm ${!dogAllergy ? "border-green-500 bg-green-50 text-green-700" : "border-gray-200 hover:border-green-300"
+                      }`}
                   >
                     {t("rsvp.form.health.no")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setDogAllergy(true)}
-                    className={`p-3 rounded-lg border-2 transition-all text-sm ${
-                      dogAllergy ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
-                    }`}
+                    className={`p-3 rounded-lg border-2 transition-all text-sm ${dogAllergy ? "border-red-500 bg-red-50 text-red-700" : "border-gray-200 hover:border-red-300"
+                      }`}
                   >
                     {t("rsvp.form.health.yes")}
                   </button>
@@ -553,13 +552,13 @@ export default function GuestEditDialog({
                     {foods.map((name) => (
                       <span
                         key={name}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800"
+                        className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800 max-w-full"
                       >
-                        {name}
+                        <span className="truncate">{name}</span>
                         <button
                           type="button"
                           onClick={() => removeFoodAllergy(name)}
-                          className="ml-2 hover:text-orange-600"
+                          className="ml-2 hover:text-orange-600 shrink-0"
                           aria-label="remove"
                         >
                           <XMarkIcon className="w-4 h-4" />
@@ -570,7 +569,7 @@ export default function GuestEditDialog({
                 )}
 
                 {showAllergenSelect && (
-                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 overflow-hidden">
                     <p className="text-sm text-gray-600 mb-2">{t("rsvp.form.health.commonAllergens")}</p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                       {COMMON_ALLERGENS.map((name) => (
@@ -585,24 +584,26 @@ export default function GuestEditDialog({
                       ))}
                     </div>
 
-                    <div className="flex gap-2">
+                    {/* 入力＋追加（モバイルは縦積み、未入力はdisabled） */}
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
                       <input
                         type="text"
                         value={customAllergen}
                         onChange={(e) => setCustomAllergen(e.target.value)}
                         placeholder={t("rsvp.form.health.foodAllergyPlaceholder")}
-                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        className="flex-1 w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
                             e.preventDefault();
-                            addFoodAllergy(customAllergen);
+                            if (customAllergen.trim()) addFoodAllergy(customAllergen);
                           }
                         }}
                       />
                       <button
                         type="button"
                         onClick={() => addFoodAllergy(customAllergen)}
-                        className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-sm"
+                        disabled={!canAddCustom}
+                        className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-sm w-full sm:w-auto shrink-0 disabled:bg-gray-300"
                       >
                         {t("rsvp.form.health.add")}
                       </button>
@@ -613,22 +614,25 @@ export default function GuestEditDialog({
             </div>
           </div>
 
-          <DialogFooter className="mt-8 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
-            >
-              {t("admin.guests.editDialog.cancel")}
-            </button>
-            <button
-              type="submit"
-              disabled={pending || !isDirty /* ← 変更がなければ無効化 */}
-              className="ml-auto px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:bg-gray-300 transition-colors"
-            >
-              {pending ? t("rsvp.form.submitting") : t("admin.guests.editDialog.save")}
-            </button>
+          <DialogFooter className="mt-8">
+            <div className="flex w-full items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                {t("admin.guests.editDialog.cancel")}
+              </button>
+              <button
+                type="submit"
+                disabled={pending || !isDirty}
+                className="px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:bg-gray-300 transition-colors"
+              >
+                {pending ? t("rsvp.form.submitting") : t("admin.guests.editDialog.save")}
+              </button>
+            </div>
           </DialogFooter>
+
         </form>
       </DialogContent>
     </Dialog>
