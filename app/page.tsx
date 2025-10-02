@@ -29,6 +29,8 @@ export default function Home({
         <Hero />
       </section>
 
+      <SectionDivider />
+
       <section id="greeting" className="py-16 md:py-24">
         <Greeting />
       </section>

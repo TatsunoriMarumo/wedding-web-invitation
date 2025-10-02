@@ -2,7 +2,8 @@ import { signOut } from "@/auth";
 
 export const ja = {
   nav: {
-    intro: "ご挨拶",
+    intro: "トップ",
+    greeting: "ご挨拶",
     profile: "プロフィール",
     dresscode: "ドレスコード",
     rsvp: "出欠登録",

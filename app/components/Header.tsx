@@ -8,6 +8,7 @@ import { Bars3Icon, XMarkIcon } from "@heroicons/react/24/outline";
 // 翻訳キーをリテラルで固定しつつ、型で保証する
 const sections = [
   { id: "intro", key: "nav.intro" },
+  { id: "greeting", key: "nav.greeting" },
   { id: "profile", key: "nav.profile" },
   { id: "dresscode", key: "nav.dresscode" },
   { id: "rsvp", key: "nav.rsvp" },

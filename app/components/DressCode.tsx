@@ -32,7 +32,6 @@ export default function DressCode() {
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-green-400 to-emerald-500 p-6 text-white">
             <div className="flex items-center justify-center space-x-3">
-              <CheckIcon className="w-8 h-8" />
               <h3 className="text-2xl font-semibold">
                 {t("dresscode.ok.title")}
               </h3>
@@ -79,7 +78,6 @@ export default function DressCode() {
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
           <div className="bg-gradient-to-r from-red-400 to-pink-500 p-6 text-white">
             <div className="flex items-center justify-center space-x-3">
-              <XMarkIcon className="w-8 h-8" />
               <h3 className="text-2xl font-semibold">
                 {t("dresscode.ng.title")}
               </h3>
