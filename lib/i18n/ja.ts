@@ -44,10 +44,12 @@ export const ja = {
   },
   profile: {
     title: "プロフィール",
+    firstImpression: { title: "相手の第一印象" },
     groom: {
       name: "新郎 藤岡拓人",
       message:
         "結婚前から尻に敷かれてます",
+      firstImpression: "やっぱマスク無いほうが可愛いやん",
       alt: "新郎の写真",
     },
 
@@ -55,6 +57,7 @@ export const ja = {
       name: "新婦 和田ひなの",
       message:
         "藤岡家の影の大黒柱",
+      firstImpression: "ガタイがいい！かっこいい！",
       alt: "新婦の写真",
     },
   },
