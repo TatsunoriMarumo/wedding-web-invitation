@@ -85,14 +85,18 @@ export function GuestTable({ guests, onExportClick, onGuestUpdated }: GuestTable
           row.attendance === "ATTEND"
             ? (t("admin.guests.table.attend") ?? "出席")
             : row.attendance === "DECLINE"
-            ? (t("admin.guests.table.decline") ?? "欠席")
-            : "",
+              ? (t("admin.guests.table.decline") ?? "欠席")
+              : "",
         header: ({ column }) => <DataTableColumnHeader column={column} title={t("admin.guests.table.attendance")} />,
         cell: ({ row }) => {
           const a = row.original.attendance;
+          const isAttend = a === "ATTEND";
           return (
-            <Badge variant={a === "ATTEND" ? "default" : "destructive"}>
-              {a === "ATTEND" ? t("admin.guests.table.attend") : t("admin.guests.table.decline")}
+            <Badge
+              variant={isAttend ? "secondary" : "destructive"}
+              className={isAttend ? "bg-emerald-500 text-white hover:bg-emerald-500/90 border-transparent" : ""}
+            >
+              {isAttend ? t("admin.guests.table.attend") : t("admin.guests.table.decline")}
             </Badge>
           );
         },
