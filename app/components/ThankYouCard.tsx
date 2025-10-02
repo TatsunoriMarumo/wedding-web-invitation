@@ -5,7 +5,7 @@ import { useLanguage } from "../providers";
 import ThankYouImage from "./thank-you/ThankYouImage";
 import ThankYouActions from "./thank-you/ThankYouActions";
 
-export type Attendance = "ATTEND" | "DECLINE" | undefined;
+type Attendance = "ATTEND" | "DECLINE" | undefined;
 
 export default function ThankYouCard({
   imageSrc = "/images/rsvp/thank-you.png",

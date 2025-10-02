@@ -4,8 +4,8 @@
 import { ja } from "./ja";
 
 /** 翻訳ツリーは文字列（や文字列配列）と入れ子オブジェクトで構成される想定 */
-export type TranslationLeaf = string | readonly string[];
-export type TranslationTree =
+type TranslationLeaf = string | readonly string[];
+type TranslationTree =
   | TranslationLeaf
   | { readonly [key: string]: TranslationTree };
 

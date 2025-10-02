@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useActionState, startTransition } from "react";
+import { useState, useMemo, useEffect, useActionState, startTransition, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { PlusIcon, TrashIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import { submitRsvp, checkDuplicateAction, checkDuplicateDirect } from "@/app/rsvp/actions";
@@ -23,7 +23,7 @@ interface Person {
   firstName: string;
   email: string;
   phone: string;
-  // ISO: YYYY-MM-DD
+  // ISO: YYYY-MM-DD or "INVALID" while editing
   birthDate: string;
   allergies: AllergyItem[];
 }
@@ -46,9 +46,7 @@ type SubmitState = { success: boolean; error?: string };
 type SubmitApiResult = { success: boolean; error?: unknown };
 
 function isSubmitApiResult(v: unknown): v is SubmitApiResult {
-  return typeof v === "object" && v !== null &&
-    "success" in v &&
-    typeof (v as { success: unknown }).success === "boolean";
+  return typeof v === "object" && v !== null && "success" in v && typeof (v as { success: unknown }).success === "boolean";
 }
 
 function FieldErrorLine({
@@ -62,8 +60,7 @@ function FieldErrorLine({
     <p
       aria-live="polite"
       aria-hidden={!message}
-      className={`text-sm h-5 leading-5 ${message ? "text-red-600" : "text-transparent"
-        } ${className}`}
+      className={`text-sm h-5 leading-5 ${message ? "text-red-600" : "text-transparent"} ${className}`}
     >
       {message || "." /* 高さ確保のダミー */}
     </p>
@@ -71,13 +68,13 @@ function FieldErrorLine({
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
-const ymdToISO = (y: number, m: number, d: number) => `${y}-${pad2(m)}-${pad2(d)}`;
 const isoToSlash = (iso: string) => (iso ? iso.replaceAll("-", "/") : "");
-const isValidYMD = (y?: number, m?: number, d?: number) => {
-  if (!y || !m || !d) return false;
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCFullYear() === y && dt.getUTCMonth() + 1 === m && dt.getUTCDate() === d;
+const isoToDate = (iso?: string) => {
+  const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return undefined;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 };
+const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
 
 // エラーを常に string に正規化
 function normalizeError(e: unknown): string {
@@ -98,12 +95,12 @@ function normalizeError(e: unknown): string {
 }
 
 /* ===========================
- * Birthdate (JP)
+ * Birthdate (numeric inputs, JA)
  * =========================== */
 
-type YMD = { y: number | ""; m: number | ""; d: number | "" };
+type YMD = { y: string; m: string; d: string };
 
-function BirthdateJP({
+function BirthdateInputsJP({
   label,
   value,
   onChange,
@@ -111,171 +108,183 @@ function BirthdateJP({
   error,
 }: {
   label: string;
-  value: string; // YYYY-MM-DD
-  onChange: (iso: string) => void;
+  value: string; // YYYY-MM-DD or "INVALID" or ""
+  onChange: (isoOrInvalid: string) => void;
   required?: boolean;
   error?: string;
 }) {
-  const today = useMemo(() => {
-    const t = new Date();
-    return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
-  }, []);
-  const START_YEAR = 1900;
+  const today = useMemo(() => new Date(), []);
+  const fromYear = 1900;
 
   const parseISO = (iso?: string): YMD => {
-    const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return { y: "", m: "", d: "" };
-    return { y: parseInt(m[1], 10), m: parseInt(m[2], 10), d: parseInt(m[3], 10) };
+    const d = isoToDate(iso);
+    if (!d) return { y: "", m: "", d: "" };
+    return { y: String(d.getFullYear()), m: String(d.getMonth() + 1), d: String(d.getDate()) };
   };
 
   const [local, setLocal] = useState<YMD>(() => parseISO(value));
-  useEffect(() => setLocal(parseISO(value)), [value]);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const years = useMemo(() => {
-    const arr: number[] = [];
-    for (let y = today.y; y >= START_YEAR; y--) arr.push(y);
-    return arr;
-  }, [today.y]);
-
-  const months = useMemo(() => {
-    if (local.y === "") return [];
-    const maxM = local.y === today.y ? today.m : 12;
-    return Array.from({ length: maxM }, (_, i) => i + 1);
-  }, [local.y, today.y, today.m]);
-
-  const daysInMonth = (y: number, m: number) => new Date(y, m, 0).getDate();
-  const days = useMemo(() => {
-    if (local.y === "" || local.m === "") return [];
-    const y = local.y as number;
-    const m = local.m as number;
-    const maxDAll = daysInMonth(y, m);
-    const isThisMonth = y === today.y && m === today.m;
-    const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-    return Array.from({ length: maxD }, (_, i) => i + 1);
-  }, [local.y, local.m, today.y, today.m, today.d]);
-
-  const emitIfComplete = (next: YMD) => {
-    if (typeof next.y === "number" && typeof next.m === "number" && typeof next.d === "number") {
-      if (isValidYMD(next.y, next.m, next.d)) {
-        onChange(ymdToISO(next.y, next.m, next.d));
-        return;
-      }
-    }
-    onChange(""); // 未完成/不正は空 → 必須バリデーションで弾く
-  };
-
-  const onYearChange = (val: string) => {
-    const y: number | "" = val ? parseInt(val, 10) : "";
-    let m: number | "" = local.m;
-    let d: number | "" = local.d;
-
-    if (typeof y === "number") {
-      const maxM = y === today.y ? today.m : 12;
-      if (typeof m === "number" && m > maxM) {
-        m = "";
-        d = "";
-      }
-      if (typeof m === "number") {
-        const maxDAll = daysInMonth(y, m);
-        const isThisMonth = y === today.y && m === today.m;
-        const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-        if (typeof d === "number" && d > maxD) d = "";
-      }
+  useEffect(() => {
+    // 親からの変更（クリアなど）を同期
+    if (!value || value === "INVALID") {
+      setLocalError(value === "INVALID" ? "無効な日付です" : null);
+      if (!value) setLocal(parseISO(value));
     } else {
-      m = "";
-      d = "";
+      setLocal(parseISO(value));
+      setLocalError(null);
+    }
+  }, [value]);
+
+  const onlyDigits = (s: string) => s.replace(/\D/g, "");
+
+  const emit = (next: YMD) => {
+    const y = Number(next.y), m = Number(next.m), d = Number(next.d);
+
+    // 未完成はエラーなし・空値
+    if (!y || !m || !d) {
+      setLocalError(null);
+      onChange("");
+      return;
     }
 
-    const next: YMD = { y, m, d };
-    setLocal(next);
-    emitIfComplete(next);
-  };
-
-  const onMonthChange = (val: string) => {
-    const m: number | "" = val ? parseInt(val, 10) : "";
-    let d: number | "" = local.d;
-
-    if (typeof m === "number" && typeof local.y === "number") {
-      const y = local.y;
-      const maxDAll = daysInMonth(y, m);
-      const isThisMonth = y === today.y && m === today.m;
-      const maxD = isThisMonth ? Math.min(maxDAll, today.d) : maxDAll;
-      if (typeof d === "number" && d > maxD) d = "";
-    } else {
-      d = "";
+    // 範囲チェック（月は1-12、日は1-31）※入力中に超過させないが保険でチェック
+    if (y < fromYear || m < 1 || m > 12 || d < 1 || d > 31) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
     }
 
-    const next: YMD = { y: local.y, m, d };
-    setLocal(next);
-    emitIfComplete(next);
+    // 実在チェック（うるう年含む）
+    const maxD = daysInMonth(y, m);
+    if (d > maxD) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
+    }
+
+    // 未来日を不可
+    const dt = new Date(y, m - 1, d);
+    if (dt > today) {
+      setLocalError("無効な日付です");
+      onChange("INVALID");
+      return;
+    }
+
+    setLocalError(null);
+    onChange(`${y}-${pad2(m)}-${pad2(d)}`);
   };
 
-  const onDayChange = (val: string) => {
-    const d: number | "" = val ? parseInt(val, 10) : "";
-    const next: YMD = { y: local.y, m: local.m, d };
+  const setYear = (raw: string) => {
+    const y = onlyDigits(raw).slice(0, 4);
+    const next = { ...local, y };
     setLocal(next);
-    emitIfComplete(next);
+    emit(next);
   };
 
-  const selCls = (hasErr: boolean) =>
-    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent ${hasErr ? "border-red-500" : "border-gray-300"
-    }`;
+  const setMonth = (raw: string) => {
+    let mm = onlyDigits(raw).slice(0, 2);
+    // 入力中から13以上を許可しない（即時クランプ）
+    if (mm) mm = String(Math.min(parseInt(mm, 10), 12));
+    const next = { ...local, m: mm };
+    setLocal(next);
+    emit(next);
+  };
+
+  const setDay = (raw: string) => {
+    let dd = onlyDigits(raw).slice(0, 2);
+    // 入力中から32以上を許可しない（即時クランプ）
+    if (dd) dd = String(Math.min(parseInt(dd, 10), 31));
+    const next = { ...local, d: dd };
+    setLocal(next);
+    emit(next);
+  };
+
+  // 失焦時の保険：月1-12、日1-月末へ補正
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+  const normalizeMonth = () => {
+    if (!local.m) return;
+    const fixed = String(clamp(Number(local.m), 1, 12));
+    if (fixed !== local.m) {
+      const next = { ...local, m: fixed };
+      setLocal(next);
+      emit(next);
+    }
+  };
+  const normalizeDay = () => {
+    if (!local.y || !local.m || !local.d) return;
+    const maxD = daysInMonth(Number(local.y), Number(local.m));
+    const fixed = String(clamp(Number(local.d), 1, maxD));
+    if (fixed !== local.d) {
+      const next = { ...local, d: fixed };
+      setLocal(next);
+      emit(next);
+    }
+  };
+
+  const baseCls = (hasErr: boolean) =>
+    `px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent
+     ${hasErr ? "border-red-500" : "border-gray-300"}`;
+
+  const mergedError = localError || error;
 
   return (
-    <div>
+    <div className="scroll-mt-24">
       <label className="block text-sm font-medium text-gray-700 mb-2">
         {label} {required ? "*" : ""}
       </label>
-      <div className="flex gap-2">
+
+      <div className="grid grid-cols-3 gap-2">
         {/* 年 */}
-        <select
-          required={required}
-          value={local.y === "" ? "" : local.y}
-          onChange={(e) => onYearChange(e.target.value)}
-          className={`w-28 ${selCls(!!error)}`}
-        >
-          <option value="">年</option>
-          {years.map((y) => (
-            <option key={y} value={y}>
-              {y}年
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            placeholder="YYYY"
+            value={local.y}
+            onChange={(e) => setYear(e.target.value)}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">年</span>
+        </div>
 
         {/* 月 */}
-        <select
-          required={required}
-          value={local.m === "" ? "" : local.m}
-          onChange={(e) => onMonthChange(e.target.value)}
-          className={`w-24 ${selCls(!!error)}`}
-          disabled={local.y === ""}
-        >
-          <option value="">月</option>
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {m}月
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            placeholder="MM"
+            value={local.m}
+            onChange={(e) => setMonth(e.target.value)}
+            onBlur={normalizeMonth}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">月</span>
+        </div>
 
         {/* 日 */}
-        <select
-          required={required}
-          value={local.d === "" ? "" : local.d}
-          onChange={(e) => onDayChange(e.target.value)}
-          className={`w-24 ${selCls(!!error)}`}
-          disabled={local.y === "" || local.m === ""}
-        >
-          <option value="">日</option>
-          {days.map((d) => (
-            <option key={d} value={d}>
-              {d}日
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={2}
+            placeholder="DD"
+            value={local.d}
+            onChange={(e) => setDay(e.target.value)}
+            onBlur={normalizeDay}
+            className={`w-full min-w-0 ${baseCls(!!mergedError)}`}
+            aria-invalid={!!mergedError}
+          />
+          <span className="text-sm text-gray-600">日</span>
+        </div>
       </div>
+
       <p className="mt-2 text-xs text-gray-500">形式：YYYY/MM/DD（例：1990/06/15）</p>
-      <FieldErrorLine message={error} />
+      <FieldErrorLine message={mergedError} />
     </div>
   );
 }
@@ -325,6 +334,7 @@ function AllergyInput({
   const { t } = useLanguage();
   const [showAllergenSelect, setShowAllergenSelect] = useState(false);
   const [customAllergen, setCustomAllergen] = useState("");
+  const customInputRef = useRef<HTMLInputElement | null>(null);
 
   const hasDogAllergy = person.allergies.some((a) => a.type === "dog");
   const foodAllergies = person.allergies.filter((a) => a.type === "food");
@@ -352,14 +362,17 @@ function AllergyInput({
       onUpdate([...person.allergies, { id: crypto.randomUUID(), type: "food", allergen: name }]);
     }
     setCustomAllergen("");
+    // スクロール抑止：自動フォーカスしない
   };
 
   const removeAllergy = (id: string) => {
     onUpdate(person.allergies.filter((a) => a.id !== id));
   };
 
+  const canAddCustom = customAllergen.trim().length > 0;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 scroll-mt-24">
       {/* 犬アレルギー */}
       <div>
         <p className="text-sm text-gray-700 mb-2">{t("rsvp.form.health.dogAllergy")}</p>
@@ -403,13 +416,13 @@ function AllergyInput({
             {foodAllergies.map((a) => (
               <span
                 key={a.id}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800"
+                className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-orange-100 text-orange-800 max-w-full"
               >
-                {a.allergen}
+                <span className="truncate">{a.allergen}</span>
                 <button
                   type="button"
                   onClick={() => removeAllergy(a.id)}
-                  className="ml-2 hover:text-orange-600"
+                  className="ml-2 hover:text-orange-600 shrink-0"
                   aria-label="remove"
                 >
                   <XMarkIcon className="w-4 h-4" />
@@ -420,7 +433,7 @@ function AllergyInput({
         )}
 
         {showAllergenSelect && (
-          <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+          <div className="border border-gray-200 rounded-lg p-3 bg-gray-50 overflow-hidden">
             <p className="text-sm text-gray-600 mb-2">{t("rsvp.form.health.commonAllergens")}</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
               {COMMON_ALLERGENS.map((name) => (
@@ -435,24 +448,27 @@ function AllergyInput({
               ))}
             </div>
 
-            <div className="flex gap-2">
+            {/* 入力＋追加（モバイルは縦積み） */}
+            <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full">
               <input
+                ref={customInputRef}
                 type="text"
                 value={customAllergen}
                 onChange={(e) => setCustomAllergen(e.target.value)}
                 placeholder={t("rsvp.form.health.foodAllergyPlaceholder")}
-                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                className="flex-1 w-full min-w-0 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    addFoodAllergy(customAllergen);
+                    if (customAllergen.trim()) addFoodAllergy(customAllergen);
                   }
                 }}
               />
               <button
                 type="button"
                 onClick={() => addFoodAllergy(customAllergen)}
-                className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-sm"
+                disabled={!canAddCustom}
+                className="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-sm w-full sm:w-auto shrink-0 disabled:bg-gray-300"
               >
                 {t("rsvp.form.health.add")}
               </button>
@@ -482,15 +498,19 @@ type FieldErrors = {
     {
       email?: string;
       phone?: string;
-      lastName?: string;   // ← 追加：個別エラー
-      firstName?: string;  // ← 追加：個別エラー
-      birthDate?: string;  // ← 追加：個別エラー
+      lastName?: string;
+      firstName?: string;
+      birthDate?: string;
     }
   >;
 };
 
 export default function RsvpForm({ token }: { token: string }) {
   const { t } = useLanguage();
+
+  // --- スクロール用 ---
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const formElRef = useRef<HTMLFormElement | null>(null);
 
   // --- 重複チェック（Step1 代表者） ---
   const [dupState, dupFormAction, dupPending] = useActionState<DupResult, FormData>(
@@ -537,7 +557,7 @@ export default function RsvpForm({ token }: { token: string }) {
 
   const [errors, setErrors] = useState<FieldErrors>({ mainGuest: {}, companions: {} });
 
-  // スキーマ（t を使いたいのでコンポーネント内で作る）
+  // バリデーションスキーマ
   const EmailSchema = useMemo(
     () => z.string().trim().email({ message: t("rsvp.form.validation.invalidEmail") }),
     [t]
@@ -556,8 +576,22 @@ export default function RsvpForm({ token }: { token: string }) {
   );
 
   const [step, setStep] = useState<Step>(1);
-  const nextStep = () => setStep((s) => (s === 1 ? 2 : s === 2 ? 3 : s === 3 ? 4 : 4));
-  const prevStep = () => setStep((s) => (s === 4 ? 3 : s === 3 ? 2 : s === 2 ? 1 : 1));
+  const scrollToFormTop = () => {
+    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const nextStep = () =>
+    setStep((s) => {
+      const ns = s === 1 ? 2 : s === 2 ? 3 : s === 3 ? 4 : 4;
+      // DOM更新後にスクロール（初回マウント時は呼ばれない）
+      queueMicrotask(scrollToFormTop);
+      return ns;
+    });
+  const prevStep = () =>
+    setStep((s) => {
+      const ns = s === 4 ? 3 : s === 3 ? 2 : s === 2 ? 1 : 1;
+      queueMicrotask(scrollToFormTop);
+      return ns;
+    });
 
   const totalSteps = useMemo(() => (formData.attendance === "attend" ? 4 : 2), [formData.attendance]);
 
@@ -578,6 +612,7 @@ export default function RsvpForm({ token }: { token: string }) {
       nextStep();
     } else if (dupState.error === "duplicate") {
       setDupError(t("rsvp.form.error.duplicateMain"));
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [dupState, t]);
 
@@ -585,14 +620,28 @@ export default function RsvpForm({ token }: { token: string }) {
   const updateMainGuest = (updates: Partial<Person>) =>
     setFormData((p) => ({ ...p, mainGuest: { ...p.mainGuest, ...updates } }));
 
-  const addCompanion = () =>
+  // --- 同伴者追加時に新カードへスクロール ---
+  const companionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [lastAddedCompanionId, setLastAddedCompanionId] = useState<string | null>(null);
+
+  const addCompanion = () => {
+    const newId = crypto.randomUUID();
+    setLastAddedCompanionId(newId);
     setFormData((p) => ({
       ...p,
       companions: [
         ...p.companions,
-        { id: crypto.randomUUID(), lastName: "", firstName: "", email: "", phone: "", birthDate: "", allergies: [] },
+        { id: newId, lastName: "", firstName: "", email: "", phone: "", birthDate: "", allergies: [] },
       ],
     }));
+  };
+
+  useEffect(() => {
+    if (!lastAddedCompanionId) return;
+    const el = companionRefs.current[lastAddedCompanionId];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setLastAddedCompanionId(null);
+  }, [lastAddedCompanionId]);
 
   const removeCompanion = (id: string) =>
     setFormData((p) => ({ ...p, companions: p.companions.filter((c) => c.id !== id) }));
@@ -606,7 +655,6 @@ export default function RsvpForm({ token }: { token: string }) {
   const validateStep1 = (): boolean => {
     const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
 
-    // 必須: 姓・名
     if (!formData.mainGuest.lastName.trim()) {
       nextErrors.mainGuest.lastName = t("rsvp.form.validation.requiredLastName");
     }
@@ -614,27 +662,25 @@ export default function RsvpForm({ token }: { token: string }) {
       nextErrors.mainGuest.firstName = t("rsvp.form.validation.requiredFirstName");
     }
 
-    // 必須: 生年月日（BirthdateJP は未完成/不正なら空文字を返す仕様）
-    if (!formData.mainGuest.birthDate) {
+    const bd = formData.mainGuest.birthDate;
+    if (!bd) {
       nextErrors.mainGuest.birthDate = t("rsvp.form.validation.requiredBirthdate");
+    } else if (bd === "INVALID" || !/^\d{4}-\d{2}-\d{2}$/.test(bd)) {
+      nextErrors.mainGuest.birthDate = "無効な日付です";
     }
 
-    // 出欠
     if (!formData.attendance) {
       nextErrors.mainGuest.attendance = t("rsvp.form.validation.selectAttendance");
     }
 
-    // Email 形式
     const e1 = EmailSchema.safeParse(formData.mainGuest.email.trim());
     if (!e1.success) nextErrors.mainGuest.email = e1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
 
-    // Phone 形式
     const p1 = PhoneSchema.safeParse(formData.mainGuest.phone.trim());
     if (!p1.success) nextErrors.mainGuest.phone = p1.error.issues[0]?.message ?? t("rsvp.form.validation.invalidPhone");
 
     setErrors(nextErrors);
 
-    // いずれのエラーも無いか
     return (
       !nextErrors.mainGuest.lastName &&
       !nextErrors.mainGuest.firstName &&
@@ -645,7 +691,7 @@ export default function RsvpForm({ token }: { token: string }) {
     );
   };
 
-  // Step3: 同伴者のメール/電話だけ形式チェック（任意入力）+ 必須（姓・名・誕生日 ※個別キーで表示）
+  // Step3: 同伴者の形式チェック + 必須
   const validateStep3 = (): boolean => {
     const nextErrors: FieldErrors = { mainGuest: {}, companions: {} };
 
@@ -658,12 +704,13 @@ export default function RsvpForm({ token }: { token: string }) {
         birthDate?: string;
       } = {};
 
-      // 必須（個別キーを使用）
       if (!c.lastName?.trim()) ce.lastName = t("rsvp.form.validation.requiredLastName");
       if (!c.firstName?.trim()) ce.firstName = t("rsvp.form.validation.requiredFirstName");
-      if (!c.birthDate) ce.birthDate = t("rsvp.form.validation.requiredBirthdate");
 
-      // 任意の形式チェック
+      const bd = c.birthDate;
+      if (!bd) ce.birthDate = t("rsvp.form.validation.requiredBirthdate");
+      else if (bd === "INVALID" || !/^\d{4}-\d{2}-\d{2}$/.test(bd)) ce.birthDate = "無効な日付です";
+
       if (c.email?.trim()) {
         const r = EmailSchema.safeParse(c.email.trim());
         if (!r.success) ce.email = r.error.issues[0]?.message ?? t("rsvp.form.validation.invalidEmail");
@@ -678,7 +725,6 @@ export default function RsvpForm({ token }: { token: string }) {
 
     setErrors(nextErrors);
 
-    // 形式エラーなし & 必須エラーなし
     const noFormatError = Object.values(nextErrors.companions).every((v) => !v.email && !v.phone);
     const noRequiredError = Object.values(nextErrors.companions).every(
       (v) => !v.lastName && !v.firstName && !v.birthDate
@@ -687,8 +733,20 @@ export default function RsvpForm({ token }: { token: string }) {
     return noFormatError && noRequiredError;
   };
 
+  // Next押下時だけエラーへスクロールするためのフラグ
+  const [shouldFocusError, setShouldFocusError] = useState(false);
+
+  // エラー発生時は（フラグがtrueの時だけ）最初のエラー入力へスクロール
+  useEffect(() => {
+    if (!shouldFocusError) return;
+    if (!(step === 1 || step === 3)) return;
+    const el = formElRef.current?.querySelector('[aria-invalid="true"]') as HTMLElement | null;
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    setShouldFocusError(false);
+  }, [errors, step, shouldFocusError]);
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div ref={rootRef} className="max-w-3xl mx-auto scroll-mt-24">
       {/* 進捗 */}
       <div className="flex items-center justify-center mb-8">
         {Array.from({ length: totalSteps }, (_, i) => (
@@ -706,7 +764,7 @@ export default function RsvpForm({ token }: { token: string }) {
         ))}
       </div>
 
-      <form action={formAction} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+      <form ref={formElRef} action={formAction} className="bg-white rounded-2xl shadow-lg p-6 sm:p-8 overflow-hidden">
         {/* サーバーへ渡す JSON */}
         <input type="hidden" name="payload" value={payload} readOnly />
 
@@ -759,11 +817,11 @@ export default function RsvpForm({ token }: { token: string }) {
               </div>
             </div>
 
-            {/* 生年月日 */}
-            <BirthdateJP
+            {/* 生年月日（年/月/日 インプット） */}
+            <BirthdateInputsJP
               label={t("rsvp.form.birthdate")}
               value={formData.mainGuest.birthDate}
-              onChange={(iso) => updateMainGuest({ birthDate: iso })}
+              onChange={(isoOrInvalid) => updateMainGuest({ birthDate: isoOrInvalid })}
               required
               error={errors.mainGuest.birthDate}
             />
@@ -883,7 +941,13 @@ export default function RsvpForm({ token }: { token: string }) {
                 {formData.companions.map((companion, index) => {
                   const ce = errors.companions[companion.id] || {};
                   return (
-                    <div key={companion.id} className="border border-gray-200 rounded-lg p-4 space-y-4">
+                    <div
+                      key={companion.id}
+                      ref={(el) => {
+                        companionRefs.current[companion.id] = el;
+                      }}
+                      className="border border-gray-200 rounded-lg p-4 space-y-4 scroll-mt-24"
+                    >
                       <div className="flex items-center justify-between">
                         <h4 className="font-medium text-gray-700">
                           {t("rsvp.form.companions.companionNumber")} {index + 1}
@@ -927,12 +991,12 @@ export default function RsvpForm({ token }: { token: string }) {
                         </div>
                       </div>
 
-                      {/* 生年月日（日本式） */}
+                      {/* 生年月日（年/月/日 インプット） */}
                       <div className={ce.birthDate ? "border-red-500 rounded-lg" : ""}>
-                        <BirthdateJP
+                        <BirthdateInputsJP
                           label={t("rsvp.form.birthdate")}
                           value={companion.birthDate}
-                          onChange={(iso) => updateCompanion(companion.id, { birthDate: iso })}
+                          onChange={(isoOrInvalid) => updateCompanion(companion.id, { birthDate: isoOrInvalid })}
                           required
                           error={ce.birthDate}
                         />
@@ -1093,6 +1157,7 @@ export default function RsvpForm({ token }: { token: string }) {
               onClick={async () => {
                 // Step1: 代表者の必須 & 形式チェック → OKなら重複チェック
                 if (step === 1) {
+                  setShouldFocusError(true);
                   if (!validateStep1()) return;
 
                   setDupError(null);
@@ -1106,8 +1171,9 @@ export default function RsvpForm({ token }: { token: string }) {
                   return;
                 }
 
-                // Step3: 同伴者の形式チェック（任意）+ 必須（個別キーエラー）
+                // Step3: 同伴者の形式チェック + 必須
                 if (step === 3) {
+                  setShouldFocusError(true);
                   if (!validateStep3()) return;
 
                   setDupError(null);
@@ -1133,13 +1199,13 @@ export default function RsvpForm({ token }: { token: string }) {
 
                   if (dups.length) {
                     setDupError(t("rsvp.form.error.duplicateCompanions", { names: dups.join("、") }));
+                    rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
                     return;
                   }
                 }
 
                 nextStep();
               }}
-              // dupPending 中だけ無効化（presence/format は上の関数で制御）
               disabled={dupPending}
               className="ml-auto px-6 py-3 bg-pink-500 text-white rounded-xl hover:bg-pink-600 disabled:bg-gray-300 transition-colors"
             >

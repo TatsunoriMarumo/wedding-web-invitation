@@ -3,7 +3,7 @@
 
 import prisma from "@/lib/prisma";
 
-export type VerifyResult =
+type VerifyResult =
   | { ok: true; inviteeName?: string | null }
   | { ok: false; reason: "NOT_PROVIDED" | "NOT_FOUND" | "USED"; inviteeName?: string | null };
 

@@ -7,7 +7,7 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 // 本番は毎回新規、開発はホットリロード対策で使い回し
-export const prisma =
+const prisma =
   process.env.NODE_ENV === 'production'
     ? new PrismaClient()
     : (globalForPrisma.prisma ??= new PrismaClient())

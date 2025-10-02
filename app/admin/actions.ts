@@ -87,7 +87,7 @@ const toTokenDTO = (t: {
 
 type AdminRecord = { id: number; email: string; canonical: string };
 
-export type AdminDataResult =
+type AdminDataResult =
   | {
       ok: true;
       tokens: InviteToken[];
