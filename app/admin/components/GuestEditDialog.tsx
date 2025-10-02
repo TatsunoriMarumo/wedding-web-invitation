@@ -384,7 +384,7 @@ export default function GuestEditDialog({
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       {/* モバイル優先：幅は画面-16px、背の高い端末でも 90dvh 内に収めて縦スクロール */}
-      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl rounded-2xl p-0 max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl rounded-2xl p-0 max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto scrollbar-hide">
         <form
           noValidate
           onInvalid={(e) => e.preventDefault()}
