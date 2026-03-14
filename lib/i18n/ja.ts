@@ -14,9 +14,9 @@ export const ja = {
   hero: {
     title: "結婚式のご招待",
     subtitle: "藤岡家・和田家 結婚披露宴",
-    date: "2025年12月13日(土)",
+    date: "2026年9月1日(火)",
     time: "午前10時30分 挙式開始",
-    venue: "パークサイドハウス 大阪梅田",
+    venue: "○○ホテル大阪",
     greeting: `謹啓
 
     皆様いかがお過ごしでしょうか
@@ -47,7 +47,7 @@ export const ja = {
     title: "プロフィール",
     firstImpression: { title: "相手の第一印象" },
     groom: {
-      name: "新郎 藤岡拓人",
+      name: "新郎 藤岡太郎",
       message:
         "結婚前から尻に敷かれてます",
       firstImpression: "やっぱマスク無いほうが可愛いやん",
@@ -55,7 +55,7 @@ export const ja = {
     },
 
     bride: {
-      name: "新婦 和田ひなの",
+      name: "新婦 和田花子",
       message:
         "藤岡家の影の大黒柱",
       firstImpression: "ガタイがいい！かっこいい！",
@@ -213,16 +213,16 @@ export const ja = {
     transfer: {
       title: "振込先",
       accounts: {
-        bankName: "SBI新生銀行",
+        bankName: "さくら中央銀行",
         branchName: "さくら支店",
-        branchCode: "(300)",
+        branchCode: "(123)",
         accountType: "普通",
-        accountNumber: "3644081",
-        accountHolder: "藤岡拓人",
+        accountNumber: "1234567",
+        accountHolder: "藤岡太郎",
       },
     },
     deadline: {
-      note1: "※お振込みは11月30日(日)までに",
+      note1: "※お振込みは9月1日(火)までに",
       note2: "お願いいたします",
     }
   },
@@ -230,8 +230,8 @@ export const ja = {
     title: "アクセス",
     subtitle: "会場へのアクセス方法をご案内いたします",
     venue: {
-      name: "パークサイドハウス 大阪梅田",
-      address: "〒531-6101 大阪市北区大淀中1-8-30",
+      name: "○○ホテル大阪",
+      address: "〒530-0000 大阪府大阪市北区ブライダル通り2-5-1",
     },
     parking: {
       title: "駐車場について",
@@ -269,11 +269,9 @@ export const ja = {
     },
     eventCard: {
       title: "当日の詳細",
-      date: "日時: 2025年12月13日(土)午前10時30分〜",
+      date: "日時: 2026年9月1日(火)午前10時30分〜",
       reception: "受付: 午前9時30分 ~ 午前10時00分",
-      contact: "式場連絡先: 06-6458-0081",
-      addToCalendar: "カレンダーに追加",
-      share: "共有",
+      contact: "式場連絡先: 01-2345-6789"
     },
   },
   gallery: {
